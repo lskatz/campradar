@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-28T02:11:45.907735+00:00",
+  "generated_at": "2026-07-28T02:52:05.565814+00:00",
   "breaks": [
     {
       "name": "Fall Break",
@@ -103,44 +103,5 @@
       "longitude": null
     }
   },
-  "sessions": [
-    {
-      "provider_slug": "fernbank-science-center",
-      "title": "Junior Naturalists",
-      "start_date": "2027-04-05",
-      "end_date": "2027-04-09",
-      "min_age": 6,
-      "max_age": 10,
-      "daily_start": null,
-      "daily_end": null,
-      "price_usd": 325.0,
-      "registration_status": "open",
-      "registration_opens": null,
-      "url": "https://example.org/jn",
-      "description": null,
-      "source_id": "example-local",
-      "key": "d08f35dfbb6d6d75",
-      "first_seen": "2026-07-28T02:11:25.444243+00:00",
-      "is_new": false
-    },
-    {
-      "provider_slug": "fernbank-science-center",
-      "title": "Astronomy Week",
-      "start_date": "2027-04-05",
-      "end_date": "2027-04-09",
-      "min_age": 9,
-      "max_age": 11,
-      "daily_start": null,
-      "daily_end": null,
-      "price_usd": null,
-      "registration_status": "open",
-      "registration_opens": null,
-      "url": "http://localhost:8765/example-camps.html",
-      "description": "For rising grades 4-6",
-      "source_id": "example-local",
-      "key": "ef5cfad35b086771",
-      "first_seen": "2026-07-28T02:11:25.444243+00:00",
-      "is_new": false
-    }
-  ]
+  "sessions": []
 }
