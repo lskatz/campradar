@@ -1,0 +1,89 @@
+# Scheduled camp refresh and site deploy.
+#
+# Cadence is deliberately seasonal. Metro Atlanta camps open registration
+# between roughly September and February and sell out fast, so that window
+# gets a weekly check; the rest of the year a monthly check is plenty and
+# keeps us off providers' servers.
+#
+# The job commits data/state.json back to the repo. That commit history *is*
+# the archive: you can see when any given camp first appeared, which is
+# occasionally useful for predicting next year's registration date.
+
+name: Refresh camps
+
+on:
+  schedule:
+    # Mondays 11:00 UTC (07:00 ET) — a digest waiting on Monday morning.
+    - cron: "0 11 * * 1"
+  workflow_dispatch: {}   # manual runs from the Actions tab
+  push:
+    branches: [main]
+    paths:
+      - "config/**"
+      - "src/**"
+      - "site/**"
+
+permissions:
+  contents: write   # to commit refreshed state
+  pages: write
+  id-token: write
+
+concurrency:
+  group: camp-radar
+  cancel-in-progress: false   # never interrupt a run mid-write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: pip install -e ".[dev]"
+
+      - name: Test
+        # Run before fetching: a broken parser should not be allowed to
+        # overwrite good state with garbage.
+        run: pytest -q
+
+      # Preserves the HTTP cache between runs so conditional requests actually
+      # work. Without this every run re-downloads every page.
+      - name: Restore fetch cache
+        uses: actions/cache@v4
+        with:
+          path: data/raw
+          key: fetch-cache-${{ github.run_id }}
+          restore-keys: fetch-cache-
+
+      - name: Refresh
+        id: refresh
+        run: campradar refresh --verbose
+
+      - name: Commit updated state
+        run: |
+          git config user.name  "camp-radar[bot]"
+          git config user.email "camp-radar@users.noreply.github.com"
+          git add data/state.json site/assets/data/sessions.json
+          # An unchanged week is the common case, not an error.
+          git diff --staged --quiet || git commit -m "refresh: $(date -u +%Y-%m-%d)"
+          git push
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: refresh
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

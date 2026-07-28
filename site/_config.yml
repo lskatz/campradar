@@ -1,0 +1,15 @@
+# Jekyll config.
+#
+# The dashboard is plain HTML/CSS/JS with no build step — Jekyll is here only
+# so GitHub Pages serves the directory, and so index.html's front matter is
+# consumed rather than displayed.
+#
+# assets/data/sessions.json must NOT be excluded: the browser fetches it at
+# runtime. (This is why the pipeline writes there rather than to _data/, which
+# Jekyll treats as build-time input and never serves.)
+
+title: Camp Radar
+description: School-break camps in DeKalb County
+exclude:
+  - README.md
+plugins: []

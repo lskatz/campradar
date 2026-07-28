@@ -1,0 +1,146 @@
+{
+  "generated_at": "2026-07-28T02:11:45.907735+00:00",
+  "breaks": [
+    {
+      "name": "Fall Break",
+      "start": "2026-09-21",
+      "end": "2026-09-25"
+    },
+    {
+      "name": "Thanksgiving Break",
+      "start": "2026-11-23",
+      "end": "2026-11-27"
+    },
+    {
+      "name": "Winter Break",
+      "start": "2026-12-21",
+      "end": "2027-01-05"
+    },
+    {
+      "name": "Winter Holiday (MLK)",
+      "start": "2027-01-18",
+      "end": "2027-01-18"
+    },
+    {
+      "name": "Mid-Winter Break",
+      "start": "2027-02-15",
+      "end": "2027-02-19"
+    },
+    {
+      "name": "Spring Break",
+      "start": "2027-04-05",
+      "end": "2027-04-09"
+    },
+    {
+      "name": "Summer",
+      "start": "2027-05-27",
+      "end": "2027-08-03"
+    }
+  ],
+  "providers": {
+    "fernbank-science-center": {
+      "slug": "fernbank-science-center",
+      "name": "Fernbank Science Center",
+      "homepage": "https://www.fernbank.edu/",
+      "locality": "Druid Hills",
+      "latitude": null,
+      "longitude": null
+    },
+    "dunwoody-nature-center": {
+      "slug": "dunwoody-nature-center",
+      "name": "Dunwoody Nature Center",
+      "homepage": "https://dunwoodynature.org/",
+      "locality": "Dunwoody",
+      "latitude": null,
+      "longitude": null
+    },
+    "callanwolde": {
+      "slug": "callanwolde",
+      "name": "Callanwolde Fine Arts Center",
+      "homepage": "https://callanwolde.org/",
+      "locality": "Druid Hills",
+      "latitude": null,
+      "longitude": null
+    },
+    "decatur-active-living": {
+      "slug": "decatur-active-living",
+      "name": "City of Decatur Active Living",
+      "homepage": "https://www.decaturga.com/activeliving",
+      "locality": "Decatur",
+      "latitude": null,
+      "longitude": null
+    },
+    "dekalb-county-rec": {
+      "slug": "dekalb-county-rec",
+      "name": "DeKalb County Recreation, Parks & Cultural Affairs",
+      "homepage": "https://www.dekalbcountyga.gov/parks-and-recreation",
+      "locality": "DeKalb County",
+      "latitude": null,
+      "longitude": null
+    },
+    "marcus-jcc": {
+      "slug": "marcus-jcc",
+      "name": "Marcus Jewish Community Center of Atlanta",
+      "homepage": "https://www.atlantajcc.org/",
+      "locality": "Dunwoody",
+      "latitude": null,
+      "longitude": null
+    },
+    "zoo-atlanta": {
+      "slug": "zoo-atlanta",
+      "name": "Zoo Atlanta",
+      "homepage": "https://zooatlanta.org/",
+      "locality": "Grant Park",
+      "latitude": null,
+      "longitude": null
+    },
+    "atlanta-botanical-garden": {
+      "slug": "atlanta-botanical-garden",
+      "name": "Atlanta Botanical Garden",
+      "homepage": "https://atlantabg.org/",
+      "locality": "Midtown",
+      "latitude": null,
+      "longitude": null
+    }
+  },
+  "sessions": [
+    {
+      "provider_slug": "fernbank-science-center",
+      "title": "Junior Naturalists",
+      "start_date": "2027-04-05",
+      "end_date": "2027-04-09",
+      "min_age": 6,
+      "max_age": 10,
+      "daily_start": null,
+      "daily_end": null,
+      "price_usd": 325.0,
+      "registration_status": "open",
+      "registration_opens": null,
+      "url": "https://example.org/jn",
+      "description": null,
+      "source_id": "example-local",
+      "key": "d08f35dfbb6d6d75",
+      "first_seen": "2026-07-28T02:11:25.444243+00:00",
+      "is_new": false
+    },
+    {
+      "provider_slug": "fernbank-science-center",
+      "title": "Astronomy Week",
+      "start_date": "2027-04-05",
+      "end_date": "2027-04-09",
+      "min_age": 9,
+      "max_age": 11,
+      "daily_start": null,
+      "daily_end": null,
+      "price_usd": null,
+      "registration_status": "open",
+      "registration_opens": null,
+      "url": "http://localhost:8765/example-camps.html",
+      "description": "For rising grades 4-6",
+      "source_id": "example-local",
+      "key": "ef5cfad35b086771",
+      "first_seen": "2026-07-28T02:11:25.444243+00:00",
+      "is_new": false
+    }
+  ]
+}
