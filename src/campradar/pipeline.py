@@ -160,9 +160,10 @@ def _write_site_data(
 ) -> None:
     """Emit the single JSON file the dashboard reads.
 
-    Written under site/assets/data/ rather than site/_data/ because Jekyll
-    treats _data as build-time input and never serves it; the browser fetches
-    this file directly at runtime.
+    Written under site/assets/data/ rather than site/_data/ because the
+    dashboard fetches it at runtime and the whole site/ directory is served
+    verbatim by GitHub Pages — no Jekyll, no build step. A path starting with
+    an underscore would work too, but assets/data/ says what it is.
 
     Everything the browser needs ships in one request. There is no API and no
     server, which is what keeps hosting free and keeps visitor data — the kids'
