@@ -97,23 +97,68 @@ def cmd_export(args: argparse.Namespace) -> int:
     return 0
 
 
+def _add_global_flags(parser: argparse.ArgumentParser, *, with_defaults: bool) -> None:
+    """Attach `--verbose`, `--config` and `--data` to a parser.
+
+    Called once for the top-level parser and once per subcommand, so that
+    either ordering works:
+
+        campradar --verbose refresh
+        campradar refresh --verbose
+
+    Argparse does not do this on its own — a flag declared only on the parent
+    is rejected once a subcommand has been seen, which is a surprising failure
+    to meet for the first time inside CI.
+
+    Two details here are load-bearing:
+
+    * Each parser gets *fresh* action objects rather than sharing them via
+      ``parents=``. Shared actions are the same mutable objects, and
+      ``set_defaults`` rewrites ``action.default`` in place — so configuring
+      the top-level defaults would silently reconfigure the subparsers too.
+    * Subparsers use ``SUPPRESS`` (``with_defaults=False``). A subcommand
+      parses into its own namespace which is then copied over the outer one,
+      so a real default there would overwrite a value the top-level parser
+      already read. With SUPPRESS, an absent flag sets nothing and the
+      top-level value survives.
+    """
+    verbose_default = False if with_defaults else argparse.SUPPRESS
+    config_default = DEFAULT_CONFIG if with_defaults else argparse.SUPPRESS
+    data_default = DEFAULT_DATA if with_defaults else argparse.SUPPRESS
+
+    parser.add_argument(
+        "-v", "--verbose", action="store_true", default=verbose_default,
+        help="log every fetch and parse step",
+    )
+    parser.add_argument(
+        "--config", type=Path, default=config_default,
+        help=f"directory holding sources.yaml and breaks.yaml (default: {DEFAULT_CONFIG})",
+    )
+    parser.add_argument(
+        "--data", type=Path, default=data_default,
+        help=f"directory for state.json and the fetch cache (default: {DEFAULT_DATA})",
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
+    """Build the full parser. See `_add_global_flags` for the flag placement."""
     parser = argparse.ArgumentParser(prog="campradar", description=__doc__)
-    parser.add_argument("-v", "--verbose", action="store_true")
-    parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
-    parser.add_argument("--data", type=Path, default=DEFAULT_DATA)
+    _add_global_flags(parser, with_defaults=True)
 
     sub = parser.add_subparsers(dest="command", required=True)
 
     refresh = sub.add_parser("refresh", help="fetch all sources and update state")
+    _add_global_flags(refresh, with_defaults=False)
     refresh.add_argument("--site-data", type=Path, default=DEFAULT_SITE_DATA)
     refresh.set_defaults(func=cmd_refresh)
 
     probe = sub.add_parser("probe", help="check a URL for usable JSON-LD")
+    _add_global_flags(probe, with_defaults=False)
     probe.add_argument("url")
     probe.set_defaults(func=cmd_probe)
 
     export = sub.add_parser("export", help="write an .ics from current state")
+    _add_global_flags(export, with_defaults=False)
     export.add_argument("-o", "--output", type=Path, default=Path("camps.ics"))
     export.add_argument("--include-past", action="store_true")
     export.set_defaults(func=cmd_export)

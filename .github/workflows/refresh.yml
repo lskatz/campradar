@@ -70,8 +70,23 @@ jobs:
           git config user.email "camp-radar@users.noreply.github.com"
           git add data/state.json site/assets/data/sessions.json
           # An unchanged week is the common case, not an error.
-          git diff --staged --quiet || git commit -m "refresh: $(date -u +%Y-%m-%d)"
-          git push
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "refresh: $(date -u +%Y-%m-%d)"
+          # A plain push fails if main moved while the job was fetching, which
+          # in an unattended weekly job means silently losing the run. Rebase
+          # and retry once; our only change is two generated files, so there is
+          # nothing here that can meaningfully conflict.
+          git push || {
+            git pull --rebase --autostash
+            git push
+          }
+
+          # Note: this push uses GITHUB_TOKEN, and GitHub deliberately does not
+          # trigger workflows from GITHUB_TOKEN pushes — so committing to a
+          # path matched by this workflow's own `push` trigger cannot loop.
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
