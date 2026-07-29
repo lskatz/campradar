@@ -323,6 +323,61 @@ function emptyState() {
   return box;
 }
 
+/** How long ago, in the coarsest unit that still says something useful. */
+function humanAge(milliseconds) {
+  const minutes = Math.round(milliseconds / 60000);
+  if (minutes < 2) return "just now";
+  if (minutes < 60) return `${minutes} minutes ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.round(hours / 24);
+  if (days < 31) return `${days} day${days === 1 ? "" : "s"} ago`;
+  const months = Math.round(days / 30);
+  return `${months} month${months === 1 ? "" : "s"} ago`;
+}
+
+/**
+ * "Last updated" in the masthead.
+ *
+ * Shows the exact local time *and* how long ago that was. The relative form is
+ * what answers the question people actually have — a date alone reads as fresh
+ * long after it stopped being. Past STALE_AFTER_DAYS the line is marked so an
+ * abandoned dashboard admits it rather than presenting old camps as current.
+ *
+ * The timestamp is written by the pipeline on every refresh, so it moves on
+ * every `make update` whether or not any camp changed. That distinction
+ * matters: unchanged data is not the same as unchecked data.
+ */
+const STALE_AFTER_DAYS = 14;
+
+function renderUpdatedAt() {
+  const node = document.getElementById("updated-at");
+  if (!dataset.generated_at) {
+    node.textContent = "never updated";
+    node.classList.add("is-stale");
+    return;
+  }
+
+  const when = new Date(dataset.generated_at);
+  if (Number.isNaN(when.getTime())) {
+    node.textContent = "update time unreadable";
+    node.classList.add("is-stale");
+    return;
+  }
+
+  const elapsed = Date.now() - when.getTime();
+  const stamp = when.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+
+  node.textContent = `updated ${stamp} · ${humanAge(elapsed)}`;
+  node.title = when.toString();
+  node.classList.toggle("is-stale", elapsed > STALE_AFTER_DAYS * 86400000);
+}
+
 /** Status line in the masthead: what the last run actually managed to do. */
 function renderRunStatus() {
   const node = document.getElementById("run-status");
@@ -461,11 +516,7 @@ async function init() {
     return;
   }
 
-  if (dataset.generated_at) {
-    const when = new Date(dataset.generated_at);
-    document.getElementById("updated-at").textContent =
-      `updated ${when.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
-  }
+  renderUpdatedAt();
   document.getElementById("total-count").textContent =
     `${dataset.sessions.length} sessions · ${dataset.breaks.length} breaks`;
 

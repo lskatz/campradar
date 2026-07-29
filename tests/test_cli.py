@@ -6,7 +6,8 @@ on the top-level parser, so `campradar refresh --verbose` was rejected while
 scheduled GitHub Actions run, because the unit tests all called the library
 directly and never went through the parser.
 
-Parsing only — no command is executed, so these stay fast and offline.
+Mostly parsing, plus the command paths that never touch the network, so
+these stay fast and offline.
 """
 
 from __future__ import annotations
@@ -15,7 +16,13 @@ from pathlib import Path
 
 import pytest
 
-from campradar.cli import build_parser, cmd_export, cmd_probe, cmd_refresh
+from campradar.cli import (
+    _probe_targets,
+    build_parser,
+    cmd_export,
+    cmd_probe,
+    cmd_refresh,
+)
 
 
 def parse(argv: list[str]):
@@ -92,9 +99,12 @@ class TestDispatch:
 
 
 class TestSubcommandOptions:
-    def test_probe_requires_a_url(self):
-        with pytest.raises(SystemExit):
-            parse(["probe"])
+    def test_probe_url_is_optional(self):
+        """`make probe` runs bare — a required positional made the target unusable."""
+        assert parse(["probe"]).url is None
+
+    def test_probe_accepts_a_single_url(self):
+        assert parse(["probe", "https://example.org"]).url == "https://example.org"
 
     def test_export_output_defaults_and_overrides(self):
         assert parse(["export"]).output == Path("camps.ics")
@@ -102,3 +112,61 @@ class TestSubcommandOptions:
 
     def test_refresh_site_data_default(self):
         assert parse(["refresh"]).site_data == Path("site/assets/data")
+
+
+class TestProbeTargets:
+    """`campradar probe` with no URL surveys sources.yaml.
+
+    This is what `make probe` invokes, and it regressed once already: the
+    Makefile and README both documented a whole-config survey while the parser
+    demanded a positional URL, so the target could never succeed.
+    """
+
+    @staticmethod
+    def write_config(tmp_path: Path, body: str) -> Path:
+        config = tmp_path / "config"
+        config.mkdir()
+        (config / "sources.yaml").write_text(body, encoding="utf-8")
+        return config
+
+    def test_disabled_sources_are_included(self, tmp_path):
+        """Retired and placeholder entries are the point of probing, not noise."""
+        config = self.write_config(
+            tmp_path,
+            """
+            sources:
+              - id: on-by-default
+                adapter: jsonld
+                urls: [https://a.example/camps]
+              - id: retired
+                adapter: jsonld
+                enabled: false
+                urls: [https://b.example/camps]
+            """,
+        )
+        assert _probe_targets(config) == [
+            ("on-by-default", "https://a.example/camps", True),
+            ("retired", "https://b.example/camps", False),
+        ]
+
+    def test_every_url_of_a_multi_url_source_is_probed(self, tmp_path):
+        config = self.write_config(
+            tmp_path,
+            """
+            sources:
+              - id: two-pages
+                adapter: jsonld
+                enabled: true
+                urls: [https://a.example/one, https://a.example/two]
+            """,
+        )
+        assert [url for _id, url, _on in _probe_targets(config)] == [
+            "https://a.example/one",
+            "https://a.example/two",
+        ]
+
+    def test_empty_config_is_an_error_not_a_silent_pass(self, tmp_path):
+        """Exiting 0 here would let `make probe && make update` look healthy."""
+        config = self.write_config(tmp_path, "sources: []\n")
+        args = parse(["probe", "--config", str(config), "--data", str(tmp_path / "data")])
+        assert cmd_probe(args) == 1

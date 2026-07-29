@@ -26,6 +26,10 @@
   --mark-open: #a8d908;  /* registration reachable now */
   --mark-gap: #ff3d6b;   /* a break day with nothing found */
 
+  /* Not a highlighter mark. The marks above each mean one thing about the
+     camps; this one is about the data itself being too old to trust. */
+  --warn: #b4341f;
+
   --shadow: 0 1px 2px rgba(22, 33, 44, 0.06), 0 6px 16px rgba(22, 33, 44, 0.06);
   --radius: 3px;
 
@@ -86,6 +90,17 @@ a:hover { text-decoration-color: var(--mark-new); }
   margin-left: auto;
   text-align: right;
   line-height: 1.6;
+}
+
+/* Data old enough that it should not be read as current. Colour alone would
+   fail for anyone who can't see it, so the marker is a printed word too. */
+.masthead__meta .is-stale {
+  color: var(--warn);
+  font-weight: 500;
+}
+
+.masthead__meta .is-stale::after {
+  content: " — stale";
 }
 
 /* ------------------------------------------------- signature: gap chart */

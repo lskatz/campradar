@@ -57,6 +57,13 @@ providers:
     homepage: https://atlantabg.org/
     locality: Midtown
 
+  # Not a real organisation. Backs the example source below; see the comment
+  # at the top of site/example-camps.html.
+  - slug: example-collective
+    name: Example Nature & Arts Collective (fixture)
+    homepage: https://lskatz.github.io/campradar/example-camps.html
+    locality: Nowhere
+
 sources:
   # --- provider sites -----------------------------------------------------
   # These URLs are placeholders and deliberately disabled. Confirm each one
@@ -98,13 +105,17 @@ sources:
       - https://zooatlanta.org/programs/camps/
 
   # --- example ------------------------------------------------------------
-  # Enabled so a fresh clone can run `campradar refresh` end to end without
-  # touching anyone's real website. Points at the local test fixture server;
-  # see docs/architecture.md. Turn off once real sources are configured.
+  # Nine invented camps, served from this repo's own GitHub Pages deployment.
+  # Enabled so that a fresh clone gets a dashboard with something on it, and
+  # so that an empty dashboard is diagnostic: if these show up and nothing
+  # else does, the providers changed rather than the pipeline breaking.
+  #
+  # Listed last so a real provider always wins a duplicate-key collision.
+  # Retire with `enabled: false` once enough real sources work; keep the file.
 
-  - id: example-local
-    provider_slug: example-local
+  - id: example-camps
+    provider_slug: example-collective
     adapter: jsonld
-    enabled: false
+    enabled: true
     urls:
-      - http://localhost:8000/example-camps.html
+      - https://lskatz.github.io/campradar/example-camps.html

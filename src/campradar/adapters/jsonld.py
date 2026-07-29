@@ -25,7 +25,7 @@ from ..fetch import Fetcher
 from ..models import CampSession, RegistrationStatus
 from .base import Adapter
 
-__all__ = ["JsonLdAdapter", "extract_jsonld_objects", "parse_age_text"]
+__all__ = ["JsonLdAdapter", "extract_jsonld_objects", "is_event", "parse_age_text"]
 
 log = logging.getLogger(__name__)
 
@@ -87,7 +87,7 @@ def extract_jsonld_objects(html: str) -> list[dict[str, Any]]:
     return objects
 
 
-def _is_event(obj: dict[str, Any]) -> bool:
+def is_event(obj: dict[str, Any]) -> bool:
     """Whether a JSON-LD object looks like something we can book a child into."""
     raw_type = obj.get("@type", "")
     types = raw_type if isinstance(raw_type, list) else [raw_type]
@@ -188,7 +188,7 @@ class JsonLdAdapter(Adapter):
         for url in urls:
             result = fetcher.get(url)
             for obj in extract_jsonld_objects(result.text):
-                if not _is_event(obj):
+                if not is_event(obj):
                     continue
                 session = self._to_session(obj, fallback_url=url)
                 if session is not None:
