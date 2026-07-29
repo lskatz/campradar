@@ -467,9 +467,9 @@ class TestAuthFailuresAreLegible:
         monkeypatch.setenv("ACTIVE_API_KEY", SECRET)
 
     @staticmethod
-    def run_with_status(status, tmp_path):
+    def run_with_status(status, tmp_path, headers=None):
         def handler(request):
-            return httpx.Response(status, json={"error": "nope"})
+            return httpx.Response(status, json={"error": "nope"}, headers=headers or {})
 
         client = httpx.Client(transport=httpx.MockTransport(handler))
         adapter = ActiveSearchAdapter({"id": "s", "params": {"org_id": "x"}})
@@ -485,6 +485,30 @@ class TestAuthFailuresAreLegible:
         message = self.run_with_status(status, tmp_path)
         assert "ACTIVE_API_KEY" in message
         assert str(status) in message
+
+    def test_an_inactive_account_is_reported_as_such_not_as_a_bad_key(self, tmp_path):
+        """Observed in the wild: the key works, the account is not activated.
+
+        Telling someone to check their key here sends them to edit config, when
+        the fix is on ACTIVE's developer portal. Different problem, different
+        place, so the message has to distinguish them.
+        """
+        message = self.run_with_status(
+            403,
+            tmp_path,
+            headers={
+                "X-Mashery-Error-Code": "ERR_403_DEVELOPER_INACTIVE",
+                "X-Error-Detail-Header": "Account Inactive",
+            },
+        )
+        assert "developer.active.com" in message
+        assert "not a config problem" in message
+
+    def test_the_inactive_message_still_hides_the_key(self, tmp_path):
+        message = self.run_with_status(
+            403, tmp_path, headers={"X-Mashery-Error-Code": "ERR_403_DEVELOPER_INACTIVE"}
+        )
+        assert SECRET not in message
 
     def test_rate_limit_says_what_to_change(self, tmp_path):
         message = self.run_with_status(429, tmp_path)

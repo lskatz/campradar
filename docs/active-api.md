@@ -179,3 +179,23 @@ JSON errors, and field mapping all covered offline in `tests/test_active.py`.
 It has **not** been run against the live API. The response shape beyond the
 documented sample is unverified, which is why unknown values are logged rather
 than assumed. Expect at least one field to need adjusting on first contact.
+
+## If ACTIVE answers 403 "Account Inactive"
+
+Observed in practice:
+
+```
+X-Mashery-Error-Code: ERR_403_DEVELOPER_INACTIVE
+X-Error-Detail-Header: Account Inactive
+```
+
+This is **not** a wrong key and not a config problem. The key transmitted fine;
+ACTIVE's gateway (Mashery) is refusing at the *developer account* level. Usual
+causes are an unverified registration email or an application still awaiting
+approval. Fix it at `developer.active.com`, not in this repo.
+
+The adapter reads those headers and says so explicitly, because "check your key"
+sends you to the wrong place entirely.
+
+Both `activesearch` sources ship disabled for this reason. Note that Callanwolde
+does not need ACTIVE at all — see `docs/tribe-events.md`.

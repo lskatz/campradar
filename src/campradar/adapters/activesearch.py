@@ -343,12 +343,26 @@ class ActiveSearchAdapter(Adapter):
         except httpx.HTTPStatusError as exc:
             code = exc.response.status_code
             if code in (401, 403):
-                # Distinguish "your key is wrong" from "the site is down". These
-                # look identical in a generic source failure, and the difference
-                # is the entire debugging path.
+                # ACTIVE sits behind Mashery, which explains itself in headers.
+                # Reading them is the difference between "your key is wrong"
+                # (edit config) and "your account is not activated" (log in to
+                # the developer portal) — two completely different next steps
+                # that a generic 403 collapses into one dead end.
+                mashery = exc.response.headers.get("X-Mashery-Error-Code", "")
+                detail = exc.response.headers.get("X-Error-Detail-Header", "")
+                if "DEVELOPER_INACTIVE" in mashery.upper() or "inactive" in detail.lower():
+                    raise AdapterError(
+                        f"{self.source_id}: the key was accepted but the ACTIVE "
+                        f"developer account is not active ({mashery or detail}). "
+                        f"This is not a config problem — activate the account at "
+                        f"developer.active.com (check for an unverified email or an "
+                        f"application still awaiting approval), then re-enable this "
+                        f"source."
+                    ) from exc
                 raise AdapterError(
-                    f"{self.source_id}: ACTIVE rejected the key (HTTP {code}). "
-                    f"Check $ACTIVE_API_KEY is the Search API key and is active."
+                    f"{self.source_id}: ACTIVE rejected the request (HTTP {code}"
+                    f"{', ' + mashery if mashery else ''}). "
+                    f"Check $ACTIVE_API_KEY is the Search API key."
                 ) from exc
             if code == 429:
                 raise AdapterError(
