@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
-from .adapters.activesearch import build_search_url
+from .adapters.activesearch import api_base, build_search_url
 from .adapters.jsonld import extract_jsonld_objects, is_event
 from .delta import load_state
 from .fetch import Fetcher
@@ -54,9 +54,18 @@ def cmd_refresh(args: argparse.Namespace) -> int:
         previous_url=args.previous_url,
     )
 
-    print(f"Sources: {len(result.succeeded_sources)} ok, {len(result.failed_sources)} failed")
+    productive = result.productive_sources
+    print(
+        f"Sources: {len(productive)} produced camps, "
+        f"{len(result.empty_sources)} returned nothing, "
+        f"{len(result.failed_sources)} failed"
+    )
     if result.failed_sources:
-        print(f"  failed: {', '.join(result.failed_sources)}")
+        print(f"  failed:  {', '.join(sorted(result.failed_sources))}")
+    if result.empty_sources:
+        # Called out explicitly because it is the failure mode that hides: the
+        # fetch worked, the parse worked, and there is simply nothing there.
+        print(f"  nothing: {', '.join(sorted(result.empty_sources))}")
     print(f"Sessions found: {result.sessions_found}")
     if result.delta:
         print(f"Changes: {result.delta.summary()}")
@@ -250,14 +259,17 @@ def cmd_active_discover(args: argparse.Namespace) -> int:
         ("by category", {**base, "per_page": 0, "facets": "categoryName"}, "categoryName"),
     ]
 
+    base = args.api_base or api_base()
     print(f"ACTIVE search near {args.near} within {args.radius} miles")
+    if base != "https://api.amp.active.com/v2/search":
+        print(f"endpoint: {base}")
     if args.start_date:
         print(f"start_date={args.start_date}")
     print()
 
     with Fetcher(args.data / "raw", delay_seconds=max(0.5, args.delay)) as fetcher:
         for label, params, facet in questions:
-            url = build_search_url(params, api_key)
+            url = build_search_url(params, api_key, base)
             try:
                 payload = json.loads(fetcher.get(url).text)
             except Exception as exc:  # noqa: BLE001 - report and continue
@@ -296,7 +308,7 @@ def _show_org_ids(args: argparse.Namespace, api_key: str, base: dict) -> int:
     assets, whereas the GUID is the provider itself.
     """
     params = {**base, "query": args.org_query, "per_page": 50}
-    url = build_search_url(params, api_key)
+    url = build_search_url(params, api_key, args.api_base or api_base())
     with Fetcher(args.data / "raw", delay_seconds=max(0.5, args.delay)) as fetcher:
         try:
             payload = json.loads(fetcher.get(url).text)
@@ -480,6 +492,12 @@ def build_parser() -> argparse.ArgumentParser:
     discover.add_argument("--top", type=int, default=25, help="facet rows to show")
     discover.add_argument("--delay", type=float, default=0.6, help="seconds between calls")
     discover.add_argument("--api-key-env", default="ACTIVE_API_KEY", dest="api_key_env")
+    discover.add_argument(
+        "--api-base",
+        default=None,
+        metavar="URL",
+        help="override the endpoint, to test against a fixture server",
+    )
     discover.set_defaults(func=cmd_active_discover, kids=True)
 
     export = sub.add_parser("export", help="write an .ics from current state")

@@ -138,6 +138,38 @@ Notes on the awkward parts:
   vocabulary in `_SALES_STATUS` grows on evidence, not guesses — if you see that
   warning, send the value and it gets added.
 
+## Testing without spending a key
+
+The endpoint is overridable, so the whole path can be exercised offline:
+
+```bash
+campradar active-discover --api-base http://127.0.0.1:8177/v2/search
+```
+
+or per-source in `sources.yaml` with `api_base:`, or globally with
+`$ACTIVE_API_BASE`. This seam exists because the first version of
+`active-discover` shipped without ever having been run — the only way to try it
+was against a live quota with a real key, so nobody did.
+
+## When a source returns nothing
+
+`refresh` now separates three outcomes, because they need different fixes:
+
+```
+Sources: 1 produced camps, 2 returned nothing, 1 failed
+  failed:  zoo-atlanta-camps
+  nothing: dekalb-county, tucker-rec
+```
+
+- **produced camps** — working.
+- **returned nothing** — fetched and parsed fine, but there was nothing there.
+  For an ACTIVE source this usually means the `params` match no assets, or the
+  provider genuinely is not in the index. Run `active-discover` to tell which.
+- **failed** — an error. A rejected key now says so explicitly rather than
+  surfacing as a generic source failure.
+
+`sources_empty` is in `sessions.json` and on the dashboard too.
+
 ## Status
 
 The adapter is tested against fixtures built from Active's documented sample

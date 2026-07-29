@@ -49,18 +49,26 @@ from collections.abc import Iterator
 from datetime import date
 from typing import Any
 
+import httpx
+
 from ..fetch import Fetcher
 from ..models import CampSession, RegistrationStatus
 from .base import Adapter, AdapterError
 from .jsonld import parse_age_text
 
-__all__ = ["ActiveSearchAdapter", "build_search_url"]
+__all__ = ["ActiveSearchAdapter", "api_base", "build_search_url"]
 
 log = logging.getLogger(__name__)
 
 #: https, unlike the http:// shown in Active's own documentation. The key
 #: travels in the query string, so TLS is not optional.
 API_BASE = "https://api.amp.active.com/v2/search"
+
+#: Overridable so this code can be run against a local fixture server. Without
+#: a seam here, the only way to learn whether the adapter works is to spend a
+#: real key against a live quota — which is how `active-discover` came to ship
+#: without ever once having been executed.
+API_BASE_ENV = "ACTIVE_API_BASE"
 
 #: Active's documented ceiling is 2 requests/second. The Fetcher's default
 #: per-host delay is 1.5s, comfortably under, but a source may override it and
@@ -90,7 +98,16 @@ _SALES_STATUS = {
 _unknown_statuses_seen: set[str] = set()
 
 
-def build_search_url(params: dict[str, Any], api_key: str) -> str:
+def api_base(config: dict[str, Any] | None = None) -> str:
+    """Endpoint to use: explicit config, then $ACTIVE_API_BASE, then the real one."""
+    if config and config.get("api_base"):
+        return str(config["api_base"])
+    return os.environ.get(API_BASE_ENV, "").strip() or API_BASE
+
+
+def build_search_url(
+    params: dict[str, Any], api_key: str, base: str | None = None
+) -> str:
     """Assemble a search URL.
 
     Separated from the adapter so it can be tested, and reused by
@@ -116,7 +133,7 @@ def build_search_url(params: dict[str, Any], api_key: str) -> str:
     ordered = {k: params[k] for k in sorted(params) if params[k] not in (None, "")}
     # api_key goes last so the readable part of the URL stays readable, and so
     # a redacted log line still shows the whole query.
-    return f"{API_BASE}?{urlencode(ordered)}&api_key={api_key}"
+    return f"{base or api_base()}?{urlencode(ordered)}&api_key={api_key}"
 
 
 def _first(items: Any, *keys: str) -> str | None:
@@ -275,6 +292,7 @@ class ActiveSearchAdapter(Adapter):
                 f"refusing to query the whole of ACTIVE"
             )
 
+        base = api_base(self.config)
         per_page = int(self.config.get("per_page", DEFAULT_PER_PAGE))
         max_pages = int(self.config.get("max_pages", MAX_PAGES))
 
@@ -282,7 +300,7 @@ class ActiveSearchAdapter(Adapter):
         page = 1
         while page <= max_pages:
             query = {**params, "per_page": per_page, "current_page": page}
-            url = build_search_url(query, api_key)
+            url = build_search_url(query, api_key, base)
             payload = self._fetch_json(fetcher, url)
 
             results = payload.get("results")
@@ -320,7 +338,25 @@ class ActiveSearchAdapter(Adapter):
         """Fetch and decode one page, failing at source level on bad JSON."""
         import json
 
-        result = fetcher.get(url)
+        try:
+            result = fetcher.get(url)
+        except httpx.HTTPStatusError as exc:
+            code = exc.response.status_code
+            if code in (401, 403):
+                # Distinguish "your key is wrong" from "the site is down". These
+                # look identical in a generic source failure, and the difference
+                # is the entire debugging path.
+                raise AdapterError(
+                    f"{self.source_id}: ACTIVE rejected the key (HTTP {code}). "
+                    f"Check $ACTIVE_API_KEY is the Search API key and is active."
+                ) from exc
+            if code == 429:
+                raise AdapterError(
+                    f"{self.source_id}: ACTIVE rate limit hit (HTTP 429). "
+                    f"Raise the Fetcher delay above 0.5s or lower per_page."
+                ) from exc
+            raise AdapterError(f"{self.source_id}: ACTIVE returned HTTP {code}") from exc
+
         try:
             payload = json.loads(result.text)
         except json.JSONDecodeError as exc:

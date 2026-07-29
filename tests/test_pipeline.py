@@ -19,7 +19,6 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 
 import pytest
-import yaml
 
 from campradar.models import CampSession
 from campradar.pipeline import RunResult, _write_site_data, load_breaks
@@ -175,3 +174,36 @@ class TestPublishedRoundTrip:
 
         assert state_from_published({"sessions": []}) == {}
         assert state_from_published({}) == {}
+
+
+class TestEmptySourcesAreDistinctFromWorkingOnes:
+    """"Ran without erroring" and "found something" are different facts.
+
+    Conflating them is how this project spent weeks reporting "3 sources ok"
+    over an empty dashboard: every source fetched, every source parsed, and
+    every source produced nothing. The run block now says so.
+    """
+
+    def test_a_source_returning_nothing_is_recorded_as_empty(self):
+        result = RunResult(
+            succeeded_sources=["has-camps", "quiet-one"],
+            empty_sources=["quiet-one"],
+        )
+        assert result.productive_sources == ["has-camps"]
+
+    def test_productive_excludes_every_empty_source(self):
+        result = RunResult(
+            succeeded_sources=["a", "b", "c"],
+            empty_sources=["a", "c"],
+        )
+        assert result.productive_sources == ["b"]
+
+    def test_all_empty_is_not_a_total_failure(self):
+        """Nothing errored, so CI should not go red — but the report must show it."""
+        result = RunResult(succeeded_sources=["a"], empty_sources=["a"])
+        assert result.is_total_failure is False
+        assert result.productive_sources == []
+
+    def test_no_empty_sources_means_everything_produced(self):
+        result = RunResult(succeeded_sources=["a", "b"])
+        assert result.productive_sources == ["a", "b"]

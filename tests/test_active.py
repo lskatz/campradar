@@ -20,6 +20,7 @@ import pytest
 
 from campradar.adapters.activesearch import (
     ActiveSearchAdapter,
+    api_base,
     build_search_url,
 )
 from campradar.adapters.base import AdapterError
@@ -419,3 +420,80 @@ def test_the_request_actually_carries_the_key(monkeypatch, tmp_path):
     _, calls = run_adapter([payload([asset()])], tmp_path=tmp_path)
     assert f"api_key={SECRET}" in str(calls[0])
     assert json  # keeps the import honest for readers of this file
+
+
+class TestApiBaseSeam:
+    """The endpoint must be overridable, or none of this can be run at all.
+
+    `active-discover` shipped once without ever having been executed, because
+    exercising it required spending a real key against a live quota. That is a
+    testability bug, not merely an inconvenience.
+    """
+
+    def test_config_wins_over_everything(self, monkeypatch):
+        monkeypatch.setenv("ACTIVE_API_BASE", "http://from-env/v2/search")
+        assert api_base({"api_base": "http://from-config/v2/search"}) == (
+            "http://from-config/v2/search"
+        )
+
+    def test_env_is_used_when_config_is_silent(self, monkeypatch):
+        monkeypatch.setenv("ACTIVE_API_BASE", "http://from-env/v2/search")
+        assert api_base({}) == "http://from-env/v2/search"
+
+    def test_falls_back_to_the_real_endpoint(self, monkeypatch):
+        monkeypatch.delenv("ACTIVE_API_BASE", raising=False)
+        assert api_base() == "https://api.amp.active.com/v2/search"
+
+    def test_the_adapter_actually_calls_the_override(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("ACTIVE_API_KEY", SECRET)
+        monkeypatch.delenv("ACTIVE_API_BASE", raising=False)
+        _, calls = run_adapter(
+            [payload([asset()])],
+            config={"api_base": "http://fixture.test/v2/search"},
+            tmp_path=tmp_path,
+        )
+        assert str(calls[0]).startswith("http://fixture.test/v2/search?")
+
+
+class TestAuthFailuresAreLegible:
+    """A rejected key and a dead host must not look the same.
+
+    Both used to surface as a generic source failure, which hides the one piece
+    of information that determines what to do next.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _key(self, monkeypatch):
+        monkeypatch.setenv("ACTIVE_API_KEY", SECRET)
+
+    @staticmethod
+    def run_with_status(status, tmp_path):
+        def handler(request):
+            return httpx.Response(status, json={"error": "nope"})
+
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+        adapter = ActiveSearchAdapter({"id": "s", "params": {"org_id": "x"}})
+        with (
+            Fetcher(tmp_path / "raw", delay_seconds=0.0, client=client) as fetcher,
+            pytest.raises(AdapterError) as caught,
+        ):
+            adapter.run(fetcher)
+        return str(caught.value)
+
+    @pytest.mark.parametrize("status", [401, 403])
+    def test_rejected_key_names_the_env_var(self, status, tmp_path):
+        message = self.run_with_status(status, tmp_path)
+        assert "ACTIVE_API_KEY" in message
+        assert str(status) in message
+
+    def test_rate_limit_says_what_to_change(self, tmp_path):
+        message = self.run_with_status(429, tmp_path)
+        assert "429" in message
+        assert "delay" in message or "per_page" in message
+
+    def test_a_plain_server_error_is_still_reported(self, tmp_path):
+        assert "500" in self.run_with_status(500, tmp_path)
+
+    @pytest.mark.parametrize("status", [401, 403, 429, 500])
+    def test_no_status_message_leaks_the_key(self, status, tmp_path):
+        assert SECRET not in self.run_with_status(status, tmp_path)

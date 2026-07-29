@@ -388,13 +388,27 @@ function renderRunStatus() {
   }
   const ok = (run.sources_ok || []).length;
   const failed = (run.sources_failed || []).length;
+  const empty = (run.sources_empty || []).length;
+  // "ok" counts sources that ran without erroring, which includes ones that
+  // found nothing at all. Reporting only that number made an empty dashboard
+  // look like a healthy run for weeks. Show what actually produced camps.
+  const producing = Math.max(0, ok - empty);
 
   if (ok === 0 && failed === 0) {
     node.textContent = "no sources enabled";
     return;
   }
-  node.textContent =
-    `${ok} source${ok === 1 ? "" : "s"} ok` + (failed > 0 ? `, ${failed} failed` : "");
+
+  const parts = [`${producing} of ${ok + failed} sources have camps`];
+  if (empty > 0) parts.push(`${empty} found nothing`);
+  if (failed > 0) parts.push(`${failed} failed`);
+  node.textContent = parts.join(", ");
+  node.title =
+    `producing: ${(run.sources_ok || []).filter(
+      (s) => !(run.sources_empty || []).includes(s)
+    ).join(", ") || "none"}` +
+    (empty ? `\nfound nothing: ${(run.sources_empty || []).join(", ")}` : "") +
+    (failed ? `\nfailed: ${(run.sources_failed || []).join(", ")}` : "");
 }
 
 function render() {

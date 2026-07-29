@@ -125,7 +125,7 @@ sources:
   - id: callanwolde-active
     provider_slug: callanwolde
     adapter: activesearch
-    enabled: false
+    enabled: true
     params:
       # org_id: <paste organizationGuid from active-discover --org-query>
       near: Decatur,GA,US
@@ -139,7 +139,7 @@ sources:
   - id: dekalb-county-active
     provider_slug: dekalb-county
     adapter: activesearch
-    enabled: false
+    enabled: true
     params:
       # Keyword-based because no organizationGuid is known yet, and possibly
       # unindexed entirely — see the note above.

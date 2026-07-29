@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -52,9 +52,22 @@ class RunResult:
     failed_sources: list[str] = field(default_factory=list)
     succeeded_sources: list[str] = field(default_factory=list)
 
+    #: Sources that ran cleanly and returned zero sessions. A subset of
+    #: `succeeded_sources`, tracked separately because conflating the two is
+    #: actively misleading: for several weeks this project reported "3 sources
+    #: ok" while every one of them produced nothing, which looks like a healthy
+    #: run and is indistinguishable from a broken parser.
+    empty_sources: list[str] = field(default_factory=list)
+
     @property
     def total_sources(self) -> int:
         return len(self.failed_sources) + len(self.succeeded_sources)
+
+    @property
+    def productive_sources(self) -> list[str]:
+        """Sources that returned at least one session."""
+        empty = set(self.empty_sources)
+        return [s for s in self.succeeded_sources if s not in empty]
 
     @property
     def is_total_failure(self) -> bool:
@@ -135,7 +148,7 @@ def run_pipeline(
             `sessions.json` rather than from `data/state.json`. This is how CI
             runs without commit access — see docs/architecture.md.
     """
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     result = RunResult()
 
     source_configs, providers = load_sources(config_dir / "sources.yaml")
@@ -163,9 +176,15 @@ def run_pipeline(
                 result.failed_sources.append(source_id)
                 continue
 
-            log.info("%s: %d sessions", source_id, len(sessions))
             scraped.extend(sessions)
             result.succeeded_sources.append(source_id)
+            if sessions:
+                log.info("%s: %d sessions", source_id, len(sessions))
+            else:
+                # Warning, not info: a source that fetches fine and parses to
+                # nothing is the most common and least visible failure mode here.
+                result.empty_sources.append(source_id)
+                log.warning("%s: fetched cleanly but produced 0 sessions", source_id)
 
     result.sessions_found = len(scraped)
 
@@ -199,7 +218,7 @@ def _write_site_data(
     providers: dict[str, Provider],
     delta: DeltaReport,
     now: datetime,
-    result: "RunResult",
+    result: RunResult,
 ) -> None:
     """Emit the single JSON file the dashboard reads.
 
@@ -225,6 +244,7 @@ def _write_site_data(
         # which is exactly the wrong signal to give someone at 7am.
         "run": {
             "sources_ok": sorted(result.succeeded_sources),
+            "sources_empty": sorted(result.empty_sources),
             "sources_failed": sorted(result.failed_sources),
             "sessions_found": result.sessions_found,
         },
