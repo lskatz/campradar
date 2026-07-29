@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-29T23:31:05.134838+00:00",
+  "generated_at": "2026-07-29T23:37:54.784856+00:00",
   "run": {
     "sources_ok": [
       "callanwolde-camps",
@@ -7,7 +7,14 @@
       "example-camps",
       "tucker-rec"
     ],
+    "sources_empty": [
+      "callanwolde-camps",
+      "dekalb-county",
+      "tucker-rec"
+    ],
     "sources_failed": [
+      "callanwolde-active",
+      "dekalb-county-active",
       "dunwoody-nature-center-camps",
       "zoo-atlanta-camps"
     ],
@@ -142,7 +149,7 @@
       "source_id": "example-camps",
       "key": "d23be853b01c8ecc",
       "first_seen": "2026-07-29T22:34:10.082473+00:00",
-      "last_seen": "2026-07-29T23:31:05.134838+00:00",
+      "last_seen": "2026-07-29T23:37:54.784856+00:00",
       "is_new": false
     },
     {
@@ -162,7 +169,7 @@
       "source_id": "example-camps",
       "key": "179755490d5c54d8",
       "first_seen": "2026-07-29T22:34:10.082473+00:00",
-      "last_seen": "2026-07-29T23:31:05.134838+00:00",
+      "last_seen": "2026-07-29T23:37:54.784856+00:00",
       "is_new": false
     },
     {
@@ -182,7 +189,7 @@
       "source_id": "example-camps",
       "key": "f6b39af04a81f443",
       "first_seen": "2026-07-29T22:34:10.082473+00:00",
-      "last_seen": "2026-07-29T23:31:05.134838+00:00",
+      "last_seen": "2026-07-29T23:37:54.784856+00:00",
       "is_new": false
     },
     {
@@ -202,7 +209,7 @@
       "source_id": "example-camps",
       "key": "1d7785f03d598124",
       "first_seen": "2026-07-29T22:34:10.082473+00:00",
-      "last_seen": "2026-07-29T23:31:05.134838+00:00",
+      "last_seen": "2026-07-29T23:37:54.784856+00:00",
       "is_new": false
     },
     {
@@ -222,7 +229,7 @@
       "source_id": "example-camps",
       "key": "add4ffa57c69b7be",
       "first_seen": "2026-07-29T22:34:10.082473+00:00",
-      "last_seen": "2026-07-29T23:31:05.134838+00:00",
+      "last_seen": "2026-07-29T23:37:54.784856+00:00",
       "is_new": false
     },
     {
@@ -242,7 +249,7 @@
       "source_id": "example-camps",
       "key": "02edd0d88d84edd1",
       "first_seen": "2026-07-29T22:34:10.082473+00:00",
-      "last_seen": "2026-07-29T23:31:05.134838+00:00",
+      "last_seen": "2026-07-29T23:37:54.784856+00:00",
       "is_new": false
     },
     {
@@ -262,7 +269,7 @@
       "source_id": "example-camps",
       "key": "08e8586dfc285e42",
       "first_seen": "2026-07-29T22:34:10.082473+00:00",
-      "last_seen": "2026-07-29T23:31:05.134838+00:00",
+      "last_seen": "2026-07-29T23:37:54.784856+00:00",
       "is_new": false
     },
     {
@@ -282,7 +289,7 @@
       "source_id": "example-camps",
       "key": "8315104c03c4bd24",
       "first_seen": "2026-07-29T22:34:10.082473+00:00",
-      "last_seen": "2026-07-29T23:31:05.134838+00:00",
+      "last_seen": "2026-07-29T23:37:54.784856+00:00",
       "is_new": false
     },
     {
@@ -302,7 +309,7 @@
       "source_id": "example-camps",
       "key": "d0d7d53f54af9a2a",
       "first_seen": "2026-07-29T22:34:10.082473+00:00",
-      "last_seen": "2026-07-29T23:31:05.134838+00:00",
+      "last_seen": "2026-07-29T23:37:54.784856+00:00",
       "is_new": false
     }
   ]
