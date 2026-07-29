@@ -35,7 +35,7 @@ protect. Full reasoning in [docs/privacy.md](docs/privacy.md).
 git clone https://github.com/lskatz/camp-radar
 cd camp-radar
 pip install -e ".[dev]"
-pytest -q                                  # 77 tests, ~1s
+pytest -q                                  # 76 tests, ~2s
 
 # The repo ships with sample data, so the dashboard renders immediately:
 python3 -m http.server -d site 8000        # → http://localhost:8000
@@ -54,50 +54,21 @@ To pull real data, enable sources in `config/sources.yaml` and run:
 campradar refresh --verbose
 ```
 
-## Workflow: refresh locally, then push
+## CI never writes to this repo
 
-Data collection happens on your machine. CI only publishes what you pushed, so
-what's live is always something you reviewed — and Actions needs no network
-access to providers, no schedule, and no write access to the repo.
+The workflow has `contents: read` and no commit step. It publishes the Pages
+site and uploads artifacts, nothing else.
+
+Change tracking still works because `first_seen` is embedded in the published
+`sessions.json`, so each run hydrates prior state from the live site:
 
 ```bash
-make probe      # which configured sources actually expose usable data
-make update     # test, refresh, show what changed, commit, push
+campradar refresh --previous-url https://lskatz.github.io/camp-radar/assets/data/sessions.json
 ```
 
-`make update` is the whole loop. It runs the tests *before* fetching, so a
-broken parser can't overwrite good data, and prints a summary *before*
-committing so you can abort. `make publish` does the same but stops after
-staging, if you'd rather review first.
-
-`data/state.json` is committed — it's what carries `first_seen` between runs.
-`data/refresh.log` is not; it's regenerated every time.
-
-### Checking sources
-
-`make probe` (or `campradar probe`) walks every source in `sources.yaml`,
-including disabled ones, and reports which are worth turning on:
-
-```
-[off] dunwoody-nature-center-camps
-        12 usable event(s)  https://dunwoodynature.org/camps/
-           - Pond Explorers
-           - Wilderness Skills
-[off] callanwolde-camps
-       no usable JSON-LD  https://callanwolde.org/camps/
-           needs a bespoke adapter — docs/adding-a-source.md
-
-1 disabled source(s) look usable: dunwoody-nature-center-camps
-```
-
-Pass a single URL to probe just that page: `campradar probe https://...`.
-
-### If you'd rather CI did the scraping
-
-`.github/workflows/refresh.yml.disabled` is a working scheduled version. It
-never writes to the repo either — it hydrates prior state from the published
-`sessions.json` via `--previous-url`, making the deployment its own state
-store. Rename it to `.yml` to enable, and drop `deploy.yml`.
+The deployment is the state store. That also makes it self-healing — whatever
+is live is the source of truth, so a lost cache or a re-created repo converges
+on the next run rather than needing a reset.
 
 ## Reading the data directly
 
@@ -119,11 +90,8 @@ The same snippets appear on the site itself, with the URL filled in.
 
 | Command | What it does |
 |---|---|
-| `make update` | Test, refresh, review, commit, push — the main loop |
-| `make probe` | Check every configured source for usable data |
-| `make serve` | Preview the dashboard locally |
 | `campradar refresh` | Fetch all enabled sources, update state, write site data |
-| `campradar probe [url]` | Probe one page, or every configured source |
+| `campradar probe <url>` | Check whether a page exposes usable JSON-LD |
 | `campradar export -o camps.ics` | Write an `.ics` from current state |
 
 ## Layout
@@ -143,8 +111,7 @@ src/campradar/
     base.py           # adapter contract
     jsonld.py         # generic schema.org reader — covers many sites at once
 site/                 # static dashboard, no build step
-scripts/update.sh     # the local refresh-and-publish loop
-data/state.json       # committed; carries first_seen between runs
+data/state.json       # local runs only; CI hydrates from the live site instead
 ```
 
 ## Adding camps

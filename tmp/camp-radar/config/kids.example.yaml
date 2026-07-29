@@ -1,0 +1,31 @@
+# Template for local-only child profiles.
+#
+#   cp config/kids.example.yaml config/kids.local.yaml
+#
+# `kids.local.yaml` is gitignored and MUST stay that way. It is read only by
+# CLI commands you run on your own machine. It is never read by the build, is
+# never copied into site/, and nothing derived from it is published.
+#
+# If you only use the web dashboard you do not need this file at all — the
+# dashboard keeps profiles in your browser's localStorage instead, which never
+# leaves your device. See docs/privacy.md.
+
+kids:
+  - name: Kid A          # a nickname is fine; nothing here is published
+    age: 9
+    interests: [science, outdoors]
+    # Sessions ending before this need aftercare, so rank them lower.
+    earliest_pickup: "17:00"
+
+  - name: Kid B
+    age: 7
+    interests: [art, swimming]
+    earliest_pickup: "17:00"
+
+preferences:
+  # Miles from home you are willing to drive each morning.
+  max_distance_miles: 12
+  # Per child, per week.
+  max_price_per_week_usd: 350
+  # Prefer sessions that place siblings at the same provider.
+  prefer_siblings_together: true

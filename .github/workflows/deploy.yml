@@ -1,0 +1,82 @@
+# Publish the site.
+#
+# Deliberately dumb: this workflow does not scrape anything and does not write
+# to the repository. It runs the tests and deploys whatever `site/` you pushed.
+#
+# Data collection happens locally, via `scripts/update.sh`, which refreshes,
+# shows you what changed, and commits. That means the published data is always
+# something a human reviewed, and Actions never needs network access to
+# providers, write access to the repo, or a schedule.
+#
+# If you would rather have CI do the scraping on a timer, see
+# .github/workflows/refresh.yml.disabled — it works, it just needs the site to
+# be its own state store, which is a more moving parts than most people want.
+
+name: Deploy site
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - "src/**"
+      - "tests/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: camp-radar-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: pip install -e ".[dev]"
+
+      - name: Test
+        run: pytest -q
+
+      - name: Check the site has data
+        # Catches the case where sessions.json was never generated or got
+        # truncated — cheaper to fail here than to deploy an empty dashboard.
+        run: |
+          python3 - <<'PY'
+          import json, sys
+          from pathlib import Path
+          path = Path("site/assets/data/sessions.json")
+          if not path.exists():
+              sys.exit("site/assets/data/sessions.json is missing — run scripts/update.sh")
+          data = json.loads(path.read_text())
+          print(f"{len(data.get('sessions', []))} sessions, "
+                f"{len(data.get('breaks', []))} breaks, "
+                f"run={data.get('run')}")
+          PY
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

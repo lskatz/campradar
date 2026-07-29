@@ -1,0 +1,96 @@
+# Source registry.
+#
+# Adding a source is normally a change to this file alone. Before writing any
+# code for a new provider, run:
+#
+#     campradar probe https://their-site.example/camps
+#
+# If that reports usable JSON-LD, the generic `jsonld` adapter will handle it
+# and you only need an entry here. Only write a bespoke adapter when probe
+# comes back empty. See docs/adding-a-source.md.
+#
+# Order matters: when the same session is reachable through two sources, the
+# one listed first wins. Put provider sites above aggregators, since providers
+# are authoritative about their own prices and dates.
+#
+# `enabled: false` retires a source without deleting the knowledge of it —
+# useful when a site is mid-redesign and the adapter is temporarily broken.
+
+providers:
+  - slug: fernbank-science-center
+    name: Fernbank Science Center
+    homepage: https://www.fernbank.edu/
+    locality: Druid Hills
+
+  - slug: dunwoody-nature-center
+    name: Dunwoody Nature Center
+    homepage: https://dunwoodynature.org/
+    locality: Dunwoody
+
+  - slug: callanwolde
+    name: Callanwolde Fine Arts Center
+    homepage: https://callanwolde.org/
+    locality: Druid Hills
+
+  - slug: decatur-active-living
+    name: City of Decatur Active Living
+    homepage: https://www.decaturga.com/activeliving
+    locality: Decatur
+
+  - slug: dekalb-county-rec
+    name: DeKalb County Recreation, Parks & Cultural Affairs
+    homepage: https://www.dekalbcountyga.gov/parks-and-recreation
+    locality: DeKalb County
+
+  - slug: marcus-jcc
+    name: Marcus Jewish Community Center of Atlanta
+    homepage: https://www.atlantajcc.org/
+    locality: Dunwoody
+
+  - slug: zoo-atlanta
+    name: Zoo Atlanta
+    homepage: https://zooatlanta.org/
+    locality: Grant Park
+
+  - slug: atlanta-botanical-garden
+    name: Atlanta Botanical Garden
+    homepage: https://atlantabg.org/
+    locality: Midtown
+
+sources:
+  # --- provider sites -----------------------------------------------------
+  # These URLs are placeholders and deliberately disabled. Confirm each one
+  # with `campradar probe` and check the site's robots.txt before enabling.
+
+  - id: dunwoody-nature-center-camps
+    provider_slug: dunwoody-nature-center
+    adapter: jsonld
+    enabled: false
+    urls:
+      - https://dunwoodynature.org/camps/
+
+  - id: callanwolde-camps
+    provider_slug: callanwolde
+    adapter: jsonld
+    enabled: false
+    urls:
+      - https://callanwolde.org/camps/
+
+  - id: zoo-atlanta-camps
+    provider_slug: zoo-atlanta
+    adapter: jsonld
+    enabled: false
+    urls:
+      - https://zooatlanta.org/programs/camps/
+
+  # --- example ------------------------------------------------------------
+  # Enabled so a fresh clone can run `campradar refresh` end to end without
+  # touching anyone's real website. Points at the local test fixture server;
+  # see docs/architecture.md. Turn off once real sources are configured.
+
+  - id: example-local
+    provider_slug: fernbank-science-center
+    adapter: jsonld
+    enabled: false
+    urls:
+      - http://localhost:8000/example-camps.html
