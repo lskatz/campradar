@@ -1,85 +1,87 @@
 #!/usr/bin/env bash
 #
-# Local refresh-and-publish.
+# Local refresh. Runs the tests, fetches camps, rebuilds the site data, and
+# then tells you what to commit.
 #
-#   scripts/update.sh          test, refresh, show what changed, commit, push
-#   scripts/update.sh -n       stop before committing (dry run)
-#   scripts/update.sh -m "..." custom commit message
+#   make update              or  bash scripts/update.sh
+#   bash scripts/update.sh --skip-tests
 #
-# Everything happens on your machine. CI only publishes what you push, so the
-# data in the repo is exactly what you reviewed — no scheduled job scraping
-# behind your back and no write access granted to Actions.
+# This script never runs git. It only reads git state to show you what changed
+# and to print the commands you'd want next — staging, committing and pushing
+# stay entirely in your hands.
 #
-# Ordering matters here: tests run *before* the refresh so a broken parser
-# can't overwrite good data, and the summary prints *before* the commit so you
-# get a chance to abort.
+# Ordering matters: tests run *before* the refresh so a broken parser can't
+# overwrite good data.
 
 set -euo pipefail
 
-DRY_RUN=0
-MESSAGE=""
-
+SKIP_TESTS=0
 while [ $# -gt 0 ]; do
   case "$1" in
-    -n|--dry-run) DRY_RUN=1; shift ;;
-    -m|--message) MESSAGE="${2:-}"; shift 2 ;;
-    -h|--help)    sed -n '3,12p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --skip-tests) SKIP_TESTS=1; shift ;;
+    -h|--help)    sed -n '3,14p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;
   esac
 done
 
 cd "$(dirname "$0")/.."
 
-# Prefer the installed script, fall back to running from source. This is what
-# makes the script work inside a pixi or conda shell without `pip install -e .`.
-if command -v campradar >/dev/null 2>&1; then
-  CAMPRADAR="campradar"
-else
-  CAMPRADAR="env PYTHONPATH=src python3 -m campradar"
-  echo "note: campradar not on PATH, running from source"
-fi
+# Always run the code in this checkout, never a stale install on PATH.
+CAMPRADAR="env PYTHONPATH=src python3 -m campradar"
 
-echo "==> Tests"
-if command -v pytest >/dev/null 2>&1; then
-  pytest -q
-else
-  python3 -m pytest -q
-fi
-
-echo
-echo "==> Refresh"
-# No --previous-url: locally, data/state.json is the state store.
-$CAMPRADAR refresh --verbose 2>&1 | tee data/refresh.log
-
-echo
-echo "==> Changes to be committed"
-git add -A
-if git diff --staged --quiet; then
-  echo "Nothing changed. No commit needed."
-  exit 0
-fi
-git diff --staged --stat
-
-# A quick human-readable summary of what actually moved, rather than a JSON diff.
-echo
-echo "==> New camps in this run"
-grep -E "^  NEW" data/refresh.log || echo "  (none)"
-
-if [ "$DRY_RUN" -eq 1 ]; then
+if [ "$SKIP_TESTS" -eq 0 ]; then
+  echo "==> Tests"
+  PYTHONPATH=src python3 -m pytest -q
   echo
-  echo "Dry run — staged but not committed. Review with: git diff --staged"
-  echo "Commit when ready:  git commit -m 'refresh' && git push"
+fi
+
+echo "==> Refresh"
+mkdir -p data
+$CAMPRADAR refresh --verbose 2>&1 | tee data/refresh.log
+echo
+
+# --- report ---------------------------------------------------------------
+# Read-only git below. Nothing here modifies the index or the working tree.
+
+echo "==> New camps in this run"
+if grep -qE "^  NEW" data/refresh.log; then
+  grep -E "^  NEW" data/refresh.log
+else
+  echo "  (none)"
+fi
+echo
+
+if ! git rev-parse --git-dir >/dev/null 2>&1; then
+  echo "Not a git repository — nothing further to do."
   exit 0
 fi
 
-if [ -z "$MESSAGE" ]; then
-  COUNT=$(grep -cE "^  NEW" data/refresh.log || true)
-  MESSAGE="refresh $(date -u +%Y-%m-%d): ${COUNT:-0} new"
+echo "==> Files changed"
+CHANGED=$(git status --porcelain -- data site 2>/dev/null || true)
+if [ -z "$CHANGED" ]; then
+  echo "  (none — data is already up to date)"
+  echo
+  echo "Nothing to commit."
+  exit 0
 fi
+echo "$CHANGED" | sed 's/^/  /'
+echo
 
-echo
-echo "==> Commit and push"
-git commit -m "$MESSAGE"
-git push
-echo
-echo "Pushed. GitHub Actions will publish the site in a minute or two."
+NEW_COUNT=$(grep -cE "^  NEW" data/refresh.log || true)
+NEW_COUNT=${NEW_COUNT:-0}
+
+cat <<EOF
+==> Ready to publish
+
+Review the data before committing:
+
+    git diff -- site/assets/data/sessions.json
+
+Then, when it looks right:
+
+    git add data site
+    git commit -m "refresh $(date -u +%Y-%m-%d): ${NEW_COUNT} new"
+    git push
+
+Pushing to main triggers the deploy workflow, which republishes the site.
+EOF

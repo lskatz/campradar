@@ -33,7 +33,7 @@ log = logging.getLogger(__name__)
 # Identifies the bot and gives site owners a way to reach a human. Change the
 # URL to your own repo before running this against real sites.
 USER_AGENT = (
-    "CampRadar/0.1 (+https://github.com/lskatz/camp-radar; personal school-break camp tracker)"
+    "CampRadar/0.1 (+https://github.com/lskatz/campradar; personal school-break camp tracker)"
 )
 
 

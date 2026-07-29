@@ -65,10 +65,22 @@ make probe      # which configured sources actually expose usable data
 make update     # test, refresh, show what changed, commit, push
 ```
 
-`make update` is the whole loop. It runs the tests *before* fetching, so a
-broken parser can't overwrite good data, and prints a summary *before*
-committing so you can abort. `make publish` does the same but stops after
-staging, if you'd rather review first.
+`make update` runs the tests *before* fetching, so a broken parser can't
+overwrite good data. **It never runs git** — it reports what changed and prints
+the commands to run:
+
+```
+==> Files changed
+   M site/assets/data/sessions.json
+  ?? data/state.json
+
+==> Ready to publish
+    git add data site
+    git commit -m "refresh 2026-07-29: 3 new"
+    git push
+```
+
+Staging, committing and pushing stay entirely yours.
 
 `data/state.json` is committed — it's what carries `first_seen` between runs.
 `data/refresh.log` is not; it's regenerated every time.
@@ -119,9 +131,10 @@ The same snippets appear on the site itself, with the URL filled in.
 
 | Command | What it does |
 |---|---|
-| `make update` | Test, refresh, review, commit, push — the main loop |
+| `make update` | Test + refresh, then print the git commands to run |
 | `make probe` | Check every configured source for usable data |
 | `make serve` | Preview the dashboard locally |
+| `make doctor` | Diagnose which copy of the code is running |
 | `campradar refresh` | Fetch all enabled sources, update state, write site data |
 | `campradar probe [url]` | Probe one page, or every configured source |
 | `campradar export -o camps.ics` | Write an `.ics` from current state |
@@ -145,6 +158,19 @@ src/campradar/
 site/                 # static dashboard, no build step
 scripts/update.sh     # the local refresh-and-publish loop
 data/state.json       # committed; carries first_seen between runs
+```
+
+## If `campradar` and `make` disagree
+
+The `make` targets run the code in this checkout via `PYTHONPATH=src`, on
+purpose. A non-editable `pip install .` copies the code into site-packages,
+where it shadows the source tree and makes your edits appear to do nothing —
+`campradar probe` failing with "the following arguments are required: url"
+while `make probe` works is the classic symptom.
+
+```bash
+make doctor                        # shows which copy each path resolves to
+pip install -e . --force-reinstall # fix a stale install
 ```
 
 ## Adding camps

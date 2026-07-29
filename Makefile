@@ -1,40 +1,55 @@
-# Convenience targets. Everything here is a thin wrapper — the underlying
-# commands work fine on their own, this just saves typing and sidesteps the
-# executable bit on scripts/update.sh, which some checkouts don't preserve.
+# Convenience targets.
+#
+# Everything runs the code in this checkout via PYTHONPATH, deliberately NOT
+# whatever `campradar` happens to be on PATH. A stale non-editable install
+# silently shadows the source tree and makes edits appear to do nothing —
+# running from src/ removes that whole class of confusion.
+#
+# The `campradar` console script still works fine after `pip install -e .`;
+# it's just not what these targets use.
 
-.PHONY: help install test probe refresh update publish clean serve
+CAMPRADAR = PYTHONPATH=src python3 -m campradar
+
+.PHONY: help install test probe refresh update serve doctor clean
 
 help:
-	@echo "make install   install the package and dev dependencies"
-	@echo "make test      run the test suite"
 	@echo "make probe     check every configured source for usable JSON-LD"
-	@echo "make refresh   fetch camps and rebuild site data (no commit)"
-	@echo "make update    test, refresh, review, commit and push"
-	@echo "make publish   same as update but stops before committing"
-	@echo "make serve     serve the dashboard at http://localhost:8000"
+	@echo "make refresh   fetch camps and rebuild site data"
+	@echo "make update    test + refresh, then print the git commands to run"
+	@echo "make serve     preview the dashboard at http://localhost:8000"
+	@echo "make test      run the test suite"
+	@echo "make install   install the package and dev dependencies"
+	@echo "make doctor    diagnose which copy of the code is running"
 
 install:
 	pip install -e ".[dev]"
 
 test:
-	pytest -q
+	PYTHONPATH=src python3 -m pytest -q
 
 probe:
-	campradar probe
+	$(CAMPRADAR) probe
 
 refresh:
-	campradar refresh --verbose
+	$(CAMPRADAR) refresh --verbose
 
-# The main entry point for the local-first workflow.
+# The main loop. Never runs git — it tells you what to run.
 update:
 	bash scripts/update.sh
-
-publish:
-	bash scripts/update.sh --dry-run
 
 serve:
 	@echo "http://localhost:8000"
 	python3 -m http.server -d site 8000
+
+# For when `campradar` behaves differently from `make`.
+doctor:
+	@echo "source tree:   $$(PYTHONPATH=src python3 -c 'import campradar; print(campradar.__file__)')"
+	@echo "on PATH:       $$(command -v campradar || echo '(not installed)')"
+	@echo "PATH resolves: $$(python3 -c 'import campradar; print(campradar.__file__)' 2>/dev/null || echo '(not importable outside src)')"
+	@echo
+	@echo "If 'PATH resolves' points into site-packages rather than this"
+	@echo "directory, you have a stale non-editable install. Fix with:"
+	@echo "    pip install -e . --force-reinstall"
 
 clean:
 	rm -rf data/raw data/refresh.log .pytest_cache
