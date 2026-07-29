@@ -35,10 +35,17 @@ protect. Full reasoning in [docs/privacy.md](docs/privacy.md).
 git clone https://github.com/lskatz/camp-radar
 cd camp-radar
 pip install -e ".[dev]"
-pytest -q                                  # 45 tests, ~0.3s
+pytest -q                                  # 76 tests, ~2s
 
 # The repo ships with sample data, so the dashboard renders immediately:
 python3 -m http.server -d site 8000        # → http://localhost:8000
+```
+
+No install needed if you'd rather not — `python -m` works straight from the
+source tree, which is handy inside a pixi or conda shell:
+
+```bash
+PYTHONPATH=src python -m campradar refresh --verbose
 ```
 
 To pull real data, enable sources in `config/sources.yaml` and run:
@@ -46,6 +53,38 @@ To pull real data, enable sources in `config/sources.yaml` and run:
 ```bash
 campradar refresh --verbose
 ```
+
+## CI never writes to this repo
+
+The workflow has `contents: read` and no commit step. It publishes the Pages
+site and uploads artifacts, nothing else.
+
+Change tracking still works because `first_seen` is embedded in the published
+`sessions.json`, so each run hydrates prior state from the live site:
+
+```bash
+campradar refresh --previous-url https://lskatz.github.io/camp-radar/assets/data/sessions.json
+```
+
+The deployment is the state store. That also makes it self-healing — whatever
+is live is the source of truth, so a lost cache or a re-created repo converges
+on the next run rather than needing a reset.
+
+## Reading the data directly
+
+The published file is public and CORS-open:
+
+```bash
+URL=https://lskatz.github.io/camp-radar/assets/data/sessions.json
+
+# how many camps, and how the last run went
+curl -s $URL | python3 -c "import json,sys; d=json.load(sys.stdin); print(len(d['sessions']),'sessions'); print(d['run'])"
+
+# just what's new
+curl -s $URL | python3 -c "import json,sys; [print(s['start_date'], s['title']) for s in json.load(sys.stdin)['sessions'] if s['is_new']]"
+```
+
+The same snippets appear on the site itself, with the URL filled in.
 
 ## Commands
 
@@ -72,7 +111,7 @@ src/campradar/
     base.py           # adapter contract
     jsonld.py         # generic schema.org reader — covers many sites at once
 site/                 # static dashboard, no build step
-data/state.json       # committed; its git history is the archive
+data/state.json       # local runs only; CI hydrates from the live site instead
 ```
 
 ## Adding camps

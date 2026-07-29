@@ -407,6 +407,16 @@ function downloadIcs() {
 
 // -------------------------------------------------------------------- init
 
+/* Rewrite the URL placeholder in the raw-data snippets to this deployment's
+ * actual address, so they are copy-pasteable from wherever the site is hosted
+ * — a fork, a rename or a local server all get correct commands. */
+function renderRawDataUrls() {
+  const absolute = new URL(DATA_URL, window.location.href).href;
+  document.querySelectorAll("#raw-url, #raw-count, #raw-new, #raw-jq").forEach((node) => {
+    node.textContent = node.textContent.replace(/URL/g, absolute);
+  });
+}
+
 function wireControls() {
   document.getElementById("add-kid").addEventListener("click", () => {
     const nameInput = document.getElementById("kid-name");
@@ -433,6 +443,7 @@ function wireControls() {
 async function init() {
   kids = loadKids();
   wireControls();
+  renderRawDataUrls();
 
   try {
     const response = await fetch(DATA_URL, { cache: "no-cache" });

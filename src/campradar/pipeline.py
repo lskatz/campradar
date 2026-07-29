@@ -18,10 +18,11 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import httpx
 import yaml
 
 from .adapters import REGISTRY, AdapterError
-from .delta import DeltaReport, load_state, merge, save_state
+from .delta import DeltaReport, load_state, merge, save_state, state_from_published
 from .fetch import Fetcher
 from .models import CampSession, Provider
 
@@ -94,14 +95,46 @@ def load_breaks(path: Path) -> list[SchoolBreak]:
 # --------------------------------------------------------------------------
 
 
+def _hydrate_previous(
+    state_path: Path, previous_url: str | None
+) -> dict[str, Any]:
+    """Load prior state, preferring a published sessions.json when given.
+
+    With `previous_url` set, the deployed site acts as the state store and CI
+    needs no write access to the repository at all. A failure to reach it is
+    logged but not fatal: the run continues from an empty state, which
+    over-reports "new" for one cycle but never loses data.
+    """
+    if previous_url is None:
+        return load_state(state_path)
+
+    try:
+        response = httpx.get(previous_url, timeout=20.0, follow_redirects=True)
+        response.raise_for_status()
+        state = state_from_published(response.json())
+        log.info("hydrated %d sessions from %s", len(state), previous_url)
+        return state
+    except Exception as exc:  # noqa: BLE001 - never let this abort a run
+        # Expected on the very first deploy, when nothing is published yet.
+        log.warning("could not hydrate from %s (%s); starting fresh", previous_url, exc)
+        return {}
+
+
 def run_pipeline(
     *,
     config_dir: Path,
     data_dir: Path,
     site_data_dir: Path,
     now: datetime | None = None,
+    previous_url: str | None = None,
 ) -> RunResult:
-    """Fetch every source, merge into state, and write the site's data file."""
+    """Fetch every source, merge into state, and write the site's data file.
+
+    Args:
+        previous_url: If set, prior state is read from this published
+            `sessions.json` rather than from `data/state.json`. This is how CI
+            runs without commit access — see docs/architecture.md.
+    """
     now = now or datetime.now(timezone.utc)
     result = RunResult()
 
@@ -136,14 +169,16 @@ def run_pipeline(
 
     result.sessions_found = len(scraped)
 
-    previous = load_state(state_path)
+    previous = _hydrate_previous(state_path, previous_url)
     state, delta = merge(previous, scraped, now=now)
     result.delta = delta
 
     # Only persist *state* when something worked. Writing an empty state after
     # a total failure would mark every real session as "disappeared" and then,
     # on recovery, as "new" — a false alert storm.
-    if not result.is_total_failure:
+    if not result.is_total_failure and previous_url is None:
+        # Skipped when hydrating from a URL: in that mode the published site is
+        # the state store, and CI has no business writing to the repo.
         save_state(state_path, state)
 
     # But always publish the site data. On a total failure `state` still holds
@@ -205,6 +240,10 @@ def _write_site_data(
                 **json.loads(record.session.model_dump_json()),
                 "key": record.key,
                 "first_seen": record.first_seen.isoformat(),
+                # Published so that state_from_published() can rebuild full
+                # state from the deployed site, which is what allows CI to run
+                # without committing anything back to the repository.
+                "last_seen": record.last_seen.isoformat(),
                 "is_new": record.key in new_keys,
             }
             for record in sorted(state.values(), key=lambda r: r.session.start_date)

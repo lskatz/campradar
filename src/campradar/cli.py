@@ -42,6 +42,7 @@ def cmd_refresh(args: argparse.Namespace) -> int:
         config_dir=args.config,
         data_dir=args.data,
         site_data_dir=args.site_data,
+        previous_url=args.previous_url,
     )
 
     print(f"Sources: {len(result.succeeded_sources)} ok, {len(result.failed_sources)} failed")
@@ -150,6 +151,16 @@ def build_parser() -> argparse.ArgumentParser:
     refresh = sub.add_parser("refresh", help="fetch all sources and update state")
     _add_global_flags(refresh, with_defaults=False)
     refresh.add_argument("--site-data", type=Path, default=DEFAULT_SITE_DATA)
+    refresh.add_argument(
+        "--previous-url",
+        default=None,
+        metavar="URL",
+        help=(
+            "read prior state from a published sessions.json instead of "
+            "data/state.json. Lets CI track changes without commit access; "
+            "e.g. https://USER.github.io/camp-radar/assets/data/sessions.json"
+        ),
+    )
     refresh.set_defaults(func=cmd_refresh)
 
     probe = sub.add_parser("probe", help="check a URL for usable JSON-LD")

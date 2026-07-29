@@ -100,10 +100,19 @@ place to spend effort — put that effort into camp ingestion instead.
 weekly. Resolving coordinates once per provider and caching in `sources.yaml`
 avoids hammering a geocoder on every run.
 
-**No database.** State is a JSON file committed to git, which gives free
-history, free backups, and a readable diff per run showing exactly what
-changed. It stops scaling somewhere around tens of thousands of sessions,
-which is roughly a hundred times more than one county produces.
+**No database, and no repo writes from CI.** The obvious way to persist
+`first_seen` between runs is to commit `state.json` back from the workflow, but
+that means giving a scheduled job write access to the repository — a standing
+risk for something whose whole job is parsing untrusted HTML from the open web.
+
+Instead, `first_seen` is published *inside* `sessions.json`, and each run
+hydrates prior state from the live site (`--previous-url`). The deployment is
+the state store. CI runs with `contents: read`, and the design is self-healing:
+whatever is currently live is the source of truth, so a lost cache or a
+re-created repo converges on the next run rather than needing a reset.
+
+`data/state.json` still exists for local runs, where committing nothing is the
+default anyway.
 
 **No server.** Static hosting is free, has nothing to maintain, and — most
 importantly — gives visitor data nowhere to go. See `privacy.md`.

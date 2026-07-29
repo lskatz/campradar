@@ -66,6 +66,38 @@
     <div class="sessions" id="session-list"></div>
   </section>
 
+  <section class="panel" aria-labelledby="raw-title">
+    <div class="panel__head">
+      <h2 class="panel__title" id="raw-title">Raw data</h2>
+    </div>
+    <p class="privacy-note" style="max-width:70ch">
+      Everything on this page comes from one JSON file. It's public and
+      CORS-open, so you can query it directly — handy for checking whether a
+      refresh actually pulled anything.
+    </p>
+
+    <p class="raw-label">The whole file</p>
+    <pre class="code"><code id="raw-url">curl -s URL</code></pre>
+
+    <p class="raw-label">Count what's loaded, and check the last run</p>
+    <pre class="code"><code id="raw-count">curl -s URL | python3 -c "import json,sys; d=json.load(sys.stdin); print(len(d['sessions']),'sessions'); print(d['run'])"</code></pre>
+
+    <p class="raw-label">Just the camps added since the last refresh</p>
+    <pre class="code"><code id="raw-new">curl -s URL | python3 -c "import json,sys; [print(s['start_date'], s['title']) for s in json.load(sys.stdin)['sessions'] if s['is_new']]"</code></pre>
+
+    <p class="raw-label">Sort by price with jq</p>
+    <pre class="code"><code id="raw-jq">curl -s URL | jq -r '.sessions | sort_by(.price_usd) | .[] | "\(.price_usd // "?")\t\(.title)"'</code></pre>
+
+    <p class="privacy-note">
+      Fields per session: <code>title</code>, <code>provider_slug</code>,
+      <code>start_date</code>, <code>end_date</code>, <code>min_age</code>,
+      <code>max_age</code>, <code>price_usd</code>,
+      <code>registration_status</code>, <code>url</code>,
+      <code>first_seen</code>, <code>is_new</code>. Ages and prices are
+      <code>null</code> when the provider didn't publish them.
+    </p>
+  </section>
+
   <footer class="colophon">
     <p>
       Camp listings are collected from public provider and aggregator pages.

@@ -1,7 +1,3 @@
-# pixi environments
-.pixi/*
-!.pixi/config.toml
-pixi.lock
 # ---------------------------------------------------------------------------
 # Anything that could contain information about a child. See docs/privacy.md.
 # These patterns come first so they are impossible to miss when auditing.

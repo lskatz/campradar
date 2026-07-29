@@ -19,7 +19,7 @@ from pathlib import Path
 
 from .models import CampSession, RegistrationStatus, SessionRecord
 
-__all__ = ["DeltaReport", "merge", "load_state", "save_state"]
+__all__ = ["DeltaReport", "merge", "load_state", "save_state", "state_from_published"]
 
 
 # Statuses that mean "you can act on this right now". A session crossing into
@@ -128,6 +128,47 @@ def load_state(path: Path) -> dict[str, SessionRecord]:
         return {}
     raw = json.loads(path.read_text(encoding="utf-8"))
     return {item["key"]: SessionRecord.model_validate(item) for item in raw["sessions"]}
+
+
+#: Keys the dashboard payload adds on top of the raw CampSession fields.
+_PUBLISHED_EXTRAS = ("key", "first_seen", "last_seen", "is_new")
+
+
+def state_from_published(payload: dict) -> dict[str, SessionRecord]:
+    """Rebuild state from a published `sessions.json`.
+
+    This is what lets the pipeline run without committing anything back to the
+    repository: the deployed site *is* the state store. Every published session
+    already carries `first_seen`, so hydrating from the live URL preserves the
+    change tracking that makes "new this week" meaningful.
+
+    It is also self-healing. Whatever is currently live is the source of truth,
+    so a lost cache, a re-created repo, or a manually edited deployment all
+    converge on the next run rather than needing a reset.
+
+    Malformed entries are skipped rather than fatal. A published file is
+    outside our control once deployed, and one bad record should not stop the
+    run — the worst case is that a session is re-reported as new.
+    """
+    from datetime import datetime as _dt
+
+    state: dict[str, SessionRecord] = {}
+    for item in payload.get("sessions", []):
+        try:
+            key = item["key"]
+            first_seen = _dt.fromisoformat(item["first_seen"])
+            # `last_seen` was added after the first release; fall back to
+            # first_seen so older published files still hydrate cleanly.
+            last_seen = _dt.fromisoformat(item.get("last_seen", item["first_seen"]))
+            session = CampSession.model_validate(
+                {k: v for k, v in item.items() if k not in _PUBLISHED_EXTRAS}
+            )
+        except (KeyError, ValueError, TypeError):
+            continue
+        state[key] = SessionRecord(
+            key=key, session=session, first_seen=first_seen, last_seen=last_seen
+        )
+    return state
 
 
 def save_state(path: Path, state: dict[str, SessionRecord]) -> None:

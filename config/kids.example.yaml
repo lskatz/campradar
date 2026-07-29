@@ -12,26 +12,20 @@
 
 kids:
   - name: Kid A          # a nickname is fine; nothing here is published
-    age: 11
-    interests: [art, science, outdoors, computers, tennis]
+    age: 9
+    interests: [science, outdoors]
     # Sessions ending before this need aftercare, so rank them lower.
     earliest_pickup: "17:00"
 
   - name: Kid B
-    age: 9
-    interests: [science, computers, basketball, kickball]
-    earliest_pickup: "17:00"
-
-  - name: Kid C
-    age: 5
-    interests: [art, swimming, science]
+    age: 7
+    interests: [art, swimming]
     earliest_pickup: "17:00"
 
 preferences:
   # Miles from home you are willing to drive each morning.
   max_distance_miles: 12
   # Per child, per week.
-  max_price_per_week_usd: 400
+  max_price_per_week_usd: 350
   # Prefer sessions that place siblings at the same provider.
   prefer_siblings_together: true
-
