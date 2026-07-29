@@ -358,3 +358,47 @@ class TestBadResponses:
     def test_an_empty_events_list_is_not_an_error(self, tmp_path):
         sessions, _ = run_adapter([payload([])], tmp_path=tmp_path)
         assert sessions == []
+
+
+class TestApiPaths:
+    """The categories path must not be derived by munging the events path.
+
+    `API_PATH.replace("/events", "/categories")` matches the `/events` inside
+    `tribe/events/v1` first and yields `/wp-json/tribe/categories/v1/categories`,
+    a route that does not exist. That shipped once and was caught only by
+    running the command.
+    """
+
+    def test_events_path(self):
+        from campradar.adapters.tribe import API_PATH
+
+        assert API_PATH == "/wp-json/tribe/events/v1/events"
+
+    def test_categories_path_keeps_the_events_namespace(self):
+        from campradar.adapters.tribe import CATEGORIES_PATH
+
+        assert CATEGORIES_PATH == "/wp-json/tribe/events/v1/categories"
+
+    def test_naive_munging_would_have_been_wrong(self):
+        from campradar.adapters.tribe import API_PATH, CATEGORIES_PATH
+
+        assert API_PATH.replace("/events", "/categories") != CATEGORIES_PATH
+
+
+class TestArrayParams:
+    """WordPress array params need `key[]=`; a bare `key=` is silently ignored."""
+
+    def test_a_list_becomes_repeated_bracket_pairs(self):
+        url = build_events_url("https://e.org", {"categories": ["camps", "youth"]})
+        assert url.count("categories%5B%5D=") == 2
+
+    def test_a_scalar_stays_plain(self):
+        assert "search=camp" in build_events_url("https://e.org", {"search": "camp"})
+
+    def test_the_adapter_passes_lists_through_correctly(self, tmp_path):
+        _, calls = run_adapter(
+            [payload([event()])],
+            config={"params": {"categories": ["camps"]}},
+            tmp_path=tmp_path,
+        )
+        assert "categories%5B%5D=camps" in str(calls[0])

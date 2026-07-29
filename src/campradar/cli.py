@@ -8,6 +8,7 @@ Commands:
     refresh   Fetch all sources, update state, write site data.
     probe     Survey every configured source — or one URL — for usable JSON-LD.
     active-discover  Ask the ACTIVE API what it actually has near a place.
+    tribe-discover   Ask an Events Calendar site what is actually in it.
     export    Write an .ics file from current state.
 """
 
@@ -24,6 +25,8 @@ from pathlib import Path
 
 from .adapters.activesearch import api_base, build_search_url
 from .adapters.jsonld import extract_jsonld_objects, is_event
+from .adapters.tribe import CATEGORIES_PATH as TRIBE_CATEGORIES_PATH
+from .adapters.tribe import build_events_url, strip_html
 from .delta import load_state
 from .fetch import Fetcher
 from .icsgen import render_calendar
@@ -372,6 +375,96 @@ def _facet_counts(payload: dict, field: str) -> list[tuple[str, int]]:
     return sorted(buckets, key=lambda pair: -pair[1])
 
 
+def cmd_tribe_discover(args: argparse.Namespace) -> int:
+    """Report what is actually in a site's Events Calendar.
+
+    Written because `callanwolde-tribe` came back empty and there was no way to
+    tell which of three very different things had happened: the date window
+    excluded everything, the `search` term matched nothing, or the provider
+    keeps camps somewhere other than the events calendar entirely. Those need
+    opposite fixes, so guessing is worse than measuring.
+
+    Four questions, cheapest first:
+
+      1. Does the calendar have anything at all, unfiltered?
+      2. What categories exist, and how many events in each?
+      3. What do the soonest events actually look like?
+      4. If --search was given, how many match it?
+
+    A calendar full of concerts and no camps is a real and useful answer: it
+    means this adapter is the wrong tool for that provider, and no amount of
+    parameter tuning will change it.
+    """
+    base = args.base_url.rstrip("/")
+    print(f"Events Calendar at {base}")
+
+    with Fetcher(args.data / "raw", delay_seconds=max(0.5, args.delay)) as fetcher:
+
+        def get(url: str) -> dict | None:
+            try:
+                return json.loads(fetcher.get(url).text)
+            except Exception as exc:  # noqa: BLE001 - report and carry on
+                print(f"  failed: {redact(exc)}")
+                return None
+
+        window: dict[str, object] = {}
+        if args.start_date:
+            window["start_date"] = args.start_date
+        if args.end_date:
+            window["end_date"] = args.end_date
+
+        print("\n-- everything in the window --")
+        payload = get(build_events_url(base, {**window, "per_page": 1}))
+        if payload is None:
+            print("\nNo API here. Check /wp-json/ lists 'tribe/events/v1'.")
+            return 1
+        total = payload.get("total")
+        print(f"  {total} event(s)")
+        if not total:
+            print(
+                "  Nothing in this window. Widen or drop --start-date/--end-date\n"
+                "  before concluding the calendar is empty."
+            )
+
+        print("\n-- categories --")
+        cats = get(f"{base}{TRIBE_CATEGORIES_PATH}?per_page=100")
+        rows = (cats or {}).get("categories") or []
+        if not rows:
+            print("  none reported (the calendar may not use categories)")
+        for row in sorted(rows, key=lambda r: -int(r.get("count") or 0))[: args.top]:
+            print(f"  {int(row.get('count') or 0):>5}  {row.get('slug')}  ({row.get('name')})")
+
+        print("\n-- soonest events --")
+        payload = get(build_events_url(base, {**window, "per_page": args.top}))
+        for event in (payload or {}).get("events") or []:
+            if not isinstance(event, dict):
+                continue
+            slugs = ",".join(
+                str(c.get("slug")) for c in event.get("categories") or [] if isinstance(c, dict)
+            )
+            title = (strip_html(event.get("title")) or "?")[:52]
+            print(f"  {str(event.get('start_date'))[:10]}  {title:<53} [{slugs}]")
+
+        if args.search:
+            print(f"\n-- matching search={args.search!r} --")
+            payload = get(build_events_url(base, {**window, "search": args.search, "per_page": 1}))
+            matched = (payload or {}).get("total")
+            print(f"  {matched} event(s)")
+            if not matched:
+                print(
+                    "  Zero. Either the wording differs, or this provider does not\n"
+                    "  put camps in its events calendar at all — compare against the\n"
+                    "  category list above before adding a source."
+                )
+
+    print(
+        "\nNext: pick a slug from the category list and set it as\n"
+        "  category_slugs: [<slug>]\n"
+        "on a source of adapter: tribe, and drop `search`."
+    )
+    return 0
+
+
 def cmd_export(args: argparse.Namespace) -> int:
     """Write an .ics of everything currently in state."""
     state = load_state(args.data / "state.json")
@@ -499,6 +592,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="override the endpoint, to test against a fixture server",
     )
     discover.set_defaults(func=cmd_active_discover, kids=True)
+
+    tribe = sub.add_parser(
+        "tribe-discover",
+        help="ask an Events Calendar site what is actually in it",
+    )
+    _add_global_flags(tribe, with_defaults=False)
+    tribe.add_argument("base_url", help="site root, e.g. https://callanwolde.org")
+    tribe.add_argument("--search", default=None, help="also report how many match this term")
+    tribe.add_argument("--start-date", default=None, metavar="YYYY-MM-DD")
+    tribe.add_argument("--end-date", default=None, metavar="YYYY-MM-DD")
+    tribe.add_argument("--top", type=int, default=25, help="rows to show")
+    tribe.add_argument("--delay", type=float, default=1.0, help="seconds between calls")
+    tribe.set_defaults(func=cmd_tribe_discover)
 
     export = sub.add_parser("export", help="write an .ics from current state")
     _add_global_flags(export, with_defaults=False)

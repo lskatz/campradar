@@ -33,6 +33,39 @@ The endpoint self-documents — `GET /wp-json/tribe/events/v1/` returns the full
 parameter schema. That is how this adapter's parameters were confirmed rather
 than guessed.
 
+## Before adding a source, measure
+
+```bash
+campradar tribe-discover https://callanwolde.org --search camp
+```
+
+```
+-- everything in the window --
+  3 event(s)
+
+-- categories --
+     37  concerts  (Concerts)
+     12  exhibitions  (Exhibitions)
+      2  camps  (Camps)
+
+-- soonest events --
+  2027-04-05  Spring Break Creative Camp     [camps]
+  2026-12-28  Winter Break Clay Studio       [camps]
+  2026-09-22  Jazz on the Lawn               [concerts]
+
+-- matching search='camp' --
+  1 event(s)
+```
+
+That last number is the point. Two camps exist; `search=camp` found one, because
+"Winter Break Clay Studio" never says the word. **Never ship `search` as the
+filter** — it is WordPress full-text, so it misses camps that don't say "camp"
+and catches concerts that do.
+
+An empty result is three different problems with three different fixes: the date
+window, the search term, or the provider not putting camps in its calendar at
+all. This command tells you which.
+
 ## Configuration
 
 ```yaml

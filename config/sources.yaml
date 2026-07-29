@@ -179,16 +179,35 @@ sources:
   # descriptions too. Once the real category slugs are known (list them at
   # /wp-json/tribe/events/v1/categories) prefer category_slugs, which is exact.
 
+  # DISABLED pending one measurement. `search: camp` returned zero, and there
+  # are three very different reasons that can happen — wrong date window, the
+  # word "camp" not appearing in the titles, or camps simply not living in this
+  # calendar at all. Find out which before guessing:
+  #
+  #   campradar tribe-discover https://callanwolde.org --search camp
+  #
+  # Then set category_slugs to a real slug from that output, drop `search`, and
+  # enable. Do not ship `search` as the filter: it is WordPress full-text, so it
+  # both misses camps whose titles omit the word and catches concerts whose
+  # blurbs include it.
+  #
+  # Evidence that this may be the wrong tool for Callanwolde: the response
+  # headers on /classes/camps/ include
+  #   Link: <https://callanwolde.org/wp-json/wp/v2/pages/545>; rel="alternate"
+  # i.e. it is a *page*, not an event. Their older catalogues put classes and
+  # camps on Coursestorm, with the events calendar reserved for concerts and
+  # exhibitions. If tribe-discover shows a calendar full of concerts and no
+  # camp category, that is the answer and Coursestorm is the next target.
+
   - id: callanwolde-tribe
     provider_slug: callanwolde
     adapter: tribe
-    enabled: true
+    enabled: false
     base_url: https://callanwolde.org
     params:
-      search: camp
       start_date: 2026-08-01
       end_date: 2027-08-31
-    # category_slugs: [camps]
+    # category_slugs: [<slug from tribe-discover>]
 
   # --- example ------------------------------------------------------------
   # Nine invented camps, served from this repo's own GitHub Pages deployment.

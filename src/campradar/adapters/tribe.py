@@ -54,12 +54,23 @@ from ..models import CampSession, RegistrationStatus
 from .base import Adapter, AdapterError
 from .jsonld import parse_age_text
 
-__all__ = ["TribeEventsAdapter", "build_events_url", "strip_html"]
+__all__ = [
+    "API_PATH",
+    "CATEGORIES_PATH",
+    "TribeEventsAdapter",
+    "build_events_url",
+    "strip_html",
+]
 
 log = logging.getLogger(__name__)
 
-#: Path appended to a site root. Stable across plugin versions since v4.
-API_PATH = "/wp-json/tribe/events/v1/events"
+#: Paths appended to a site root. Stable across plugin versions since v4.
+#: Spelled out separately rather than derived from one another: string-munging
+#: API_PATH to reach the categories endpoint hits the '/events' inside
+#: 'tribe/events/v1' first and silently produces a 404 route.
+API_ROOT = "/wp-json/tribe/events/v1"
+API_PATH = f"{API_ROOT}/events"
+CATEGORIES_PATH = f"{API_ROOT}/categories"
 
 DEFAULT_PER_PAGE = 50
 
@@ -87,12 +98,30 @@ def build_events_url(base_url: str, params: dict[str, Any]) -> str:
 
         >>> build_events_url("https://e.org", {"b": 2, "a": 1})
         'https://e.org/wp-json/tribe/events/v1/events?a=1&b=2'
+
+    List values become repeated `key[]=` pairs, which is what WordPress expects
+    and what the plugin's own forum threads confirm is required:
+
+        >>> build_events_url("https://e.org", {"categories": ["camps", "youth"]})
+        'https://e.org/wp-json/tribe/events/v1/events?categories%5B%5D=camps&categories%5B%5D=youth'
     """
     from urllib.parse import urlencode
 
     root = base_url.rstrip("/")
-    ordered = {k: params[k] for k in sorted(params) if params[k] not in (None, "")}
-    return f"{root}{API_PATH}?{urlencode(ordered)}"
+    pairs: list[tuple[str, Any]] = []
+    for key in sorted(params):
+        value = params[key]
+        if value in (None, ""):
+            continue
+        if isinstance(value, (list, tuple, set)):
+            # WordPress reads repeated array params as `key[]=a&key[]=b`. Sending
+            # a bare `categories=camps` returns everything, silently — the plugin
+            # ignores the malformed filter rather than erroring, which is the
+            # worst possible failure mode.
+            pairs.extend((f"{key}[]", item) for item in value)
+        else:
+            pairs.append((key, value))
+    return f"{root}{API_PATH}?{urlencode(pairs)}"
 
 
 def strip_html(value: Any) -> str | None:
