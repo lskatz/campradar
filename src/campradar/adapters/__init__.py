@@ -5,12 +5,20 @@ registered by name in `REGISTRY` and referenced from `config/sources.yaml`, so
 adding a source is a config change plus (sometimes) one new module.
 """
 
+from .activesearch import ActiveSearchAdapter
 from .base import Adapter, AdapterError
 from .jsonld import JsonLdAdapter
 
 #: Maps the `adapter:` field in sources.yaml to an implementation.
 REGISTRY: dict[str, type[Adapter]] = {
+    "activesearch": ActiveSearchAdapter,
     "jsonld": JsonLdAdapter,
 }
 
-__all__ = ["Adapter", "AdapterError", "JsonLdAdapter", "REGISTRY"]
+__all__ = [
+    "ActiveSearchAdapter",
+    "Adapter",
+    "AdapterError",
+    "JsonLdAdapter",
+    "REGISTRY",
+]

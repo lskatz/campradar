@@ -10,6 +10,13 @@ config/*.local.yaml
 # contact details we have no business republishing.
 data/raw/
 
+# Run log. Previously committed, which was a mistake: httpx logs full request
+# URLs, and any API key travelling in a query string would land in git history
+# on a public repo. Redaction in campradar/redact.py is the primary defence;
+# not committing the log is the second one. Both, because a leaked credential
+# cannot be un-pushed.
+data/refresh.log
+
 # Python
 __pycache__/
 *.py[cod]

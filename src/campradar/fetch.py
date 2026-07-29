@@ -26,6 +26,8 @@ from urllib.parse import urlparse
 
 import httpx
 
+from .redact import redact
+
 __all__ = ["FetchResult", "Fetcher"]
 
 log = logging.getLogger(__name__)
@@ -145,7 +147,9 @@ class Fetcher:
         meta_path.write_text(
             json.dumps(
                 {
-                    "url": url,
+                    # Redacted: this file is a debugging aid, not a place to
+                    # persist a credential in plaintext.
+                    "url": redact(url),
                     "etag": response.headers.get("ETag"),
                     "last_modified": response.headers.get("Last-Modified"),
                 }

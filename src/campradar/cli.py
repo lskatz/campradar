@@ -7,23 +7,28 @@ break a scheduled job nobody is watching.
 Commands:
     refresh   Fetch all sources, update state, write site data.
     probe     Survey every configured source — or one URL — for usable JSON-LD.
+    active-discover  Ask the ACTIVE API what it actually has near a place.
     export    Write an .ics file from current state.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import logging
+import os
 import sys
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
+from .adapters.activesearch import build_search_url
 from .adapters.jsonld import extract_jsonld_objects, is_event
 from .delta import load_state
 from .fetch import Fetcher
 from .icsgen import render_calendar
 from .pipeline import load_sources, run_pipeline
+from .redact import install_redaction, redact
 
 DEFAULT_CONFIG = Path("config")
 DEFAULT_DATA = Path("data")
@@ -35,6 +40,9 @@ def _configure_logging(verbose: bool) -> None:
         level=logging.DEBUG if verbose else logging.INFO,
         format="%(levelname)-7s %(name)s: %(message)s",
     )
+    # httpx logs full request URLs at INFO, and the Active API carries its key
+    # in the query string. Install this before any request can be made.
+    install_redaction()
 
 
 def cmd_refresh(args: argparse.Namespace) -> int:
@@ -106,7 +114,7 @@ def _probe_one(fetcher: Fetcher, source_id: str, url: str, enabled: bool) -> Pro
     try:
         result = fetcher.get(url)
     except Exception as exc:  # noqa: BLE001 - one dead site must not end the survey
-        report.error = str(exc).splitlines()[0]
+        report.error = redact(exc).splitlines()[0]
         return report
 
     report.reachable = True
@@ -120,14 +128,15 @@ def _probe_one(fetcher: Fetcher, source_id: str, url: str, enabled: bool) -> Pro
 
 def _render(report: ProbeReport, *, show_marker: bool) -> None:
     """Print one report in the format documented in the README."""
+    shown = redact(report.url)
     if show_marker:
         marker = "[on]" if report.enabled else "[off]"
         print(f"{marker:<5} {report.source_id}")
         # In a sweep the id is the heading, so each status line carries the URL.
-        where = f"  {report.url}"
+        where = f"  {shown}"
     else:
         # Probing one page: the URL is the heading and would only repeat below.
-        print(report.url)
+        print(shown)
         where = ""
 
     if not report.reachable:
@@ -194,6 +203,161 @@ def cmd_probe(args: argparse.Namespace) -> int:
         print("Nothing was reachable — check your network before trusting this.", file=sys.stderr)
         return 1
     return 0
+
+
+def cmd_active_discover(args: argparse.Namespace) -> int:
+    """Report what the ACTIVE Activity Search API actually holds near a place.
+
+    This exists because coverage is an open question, not a known quantity.
+    Active Network sells several products; this search index is fed from
+    ACTIVE.com assets, and it is unconfirmed whether ActiveNet municipal
+    instances (DeKalb County's registration system, for one) are indexed in it
+    at all. Guessing would mean building a source config against data that may
+    not exist.
+
+    So rather than assume, this asks three questions in three calls:
+
+      1. How many kids' activities are there near here at all?
+      2. Which organisations do they belong to?  (-> org_id for a source)
+      3. Which source systems fed them?          (-> is ActiveNet in here?)
+
+    Facets do the work: `per_page=0` returns counts without asset bodies, which
+    is one cheap call per question against a 2-per-second budget.
+    """
+    api_key = os.environ.get(args.api_key_env, "").strip()
+    if not api_key:
+        print(
+            f"${args.api_key_env} is not set. Export it first:\n"
+            f"  export {args.api_key_env}=...\n"
+            f"Do not put it in config/sources.yaml — that file is committed.",
+            file=sys.stderr,
+        )
+        return 1
+
+    base: dict[str, object] = {"near": args.near, "radius": args.radius}
+    if args.kids:
+        base["kids"] = "true"
+    if args.start_date:
+        base["start_date"] = args.start_date
+
+    if args.org_query:
+        return _show_org_ids(args, api_key, base)
+
+    questions = [
+        ("total kids activities", {**base, "per_page": 0}, None),
+        ("by organisation", {**base, "per_page": 0, "facets": "organizationName"}, "organizationName"),  # noqa: E501
+        ("by source system", {**base, "per_page": 0, "facets": "sourceSystemName"}, "sourceSystemName"),  # noqa: E501
+        ("by category", {**base, "per_page": 0, "facets": "categoryName"}, "categoryName"),
+    ]
+
+    print(f"ACTIVE search near {args.near} within {args.radius} miles")
+    if args.start_date:
+        print(f"start_date={args.start_date}")
+    print()
+
+    with Fetcher(args.data / "raw", delay_seconds=max(0.5, args.delay)) as fetcher:
+        for label, params, facet in questions:
+            url = build_search_url(params, api_key)
+            try:
+                payload = json.loads(fetcher.get(url).text)
+            except Exception as exc:  # noqa: BLE001 - report and continue
+                print(f"{label}: failed — {redact(exc)}")
+                continue
+
+            total = payload.get("total_results")
+            if facet is None:
+                print(f"{label}: {total}")
+                if not total:
+                    print(
+                        "\n  Zero results. Either nothing is indexed near here, or "
+                        "\n  this account's key does not cover these assets. Widen "
+                        "\n  --radius and drop --start-date before concluding anything."
+                    )
+                continue
+
+            print(f"{label} (of {total}):")
+            for name, count in _facet_counts(payload, facet)[: args.top]:
+                print(f"  {count:>6}  {name}")
+            print()
+
+    print(
+        "Next: pick an organisation above, find its organizationGuid with\n"
+        "  campradar active-discover --org-query 'Callanwolde'\n"
+        "then use it as params.org_id in a source of adapter: activesearch."
+    )
+    return 0
+
+
+def _show_org_ids(args: argparse.Namespace, api_key: str, base: dict) -> int:
+    """List `organizationGuid` values matching a name, for use as params.org_id.
+
+    Targeting a source by organisation rather than by keyword is what makes an
+    `activesearch` source stable: a name search drifts as ACTIVE re-titles
+    assets, whereas the GUID is the provider itself.
+    """
+    params = {**base, "query": args.org_query, "per_page": 50}
+    url = build_search_url(params, api_key)
+    with Fetcher(args.data / "raw", delay_seconds=max(0.5, args.delay)) as fetcher:
+        try:
+            payload = json.loads(fetcher.get(url).text)
+        except Exception as exc:  # noqa: BLE001
+            print(f"lookup failed — {redact(exc)}", file=sys.stderr)
+            return 1
+
+    found: dict[str, tuple[str, int]] = {}
+    for asset in payload.get("results") or []:
+        if not isinstance(asset, dict):
+            continue
+        org = asset.get("organization")
+        if not isinstance(org, dict):
+            continue
+        guid = str(org.get("organizationGuid") or "").strip()
+        name = str(org.get("organizationName") or "").strip()
+        if not guid or name in ("", "N/A"):
+            continue
+        prior = found.get(guid, (name, 0))
+        found[guid] = (name, prior[1] + 1)
+
+    if not found:
+        print(f"No organisations found for {args.org_query!r} near {args.near}.")
+        print("Try --no-kids, a wider --radius, or a shorter query.")
+        return 1
+
+    print(f"Organisations matching {args.org_query!r} (assets seen on page 1):")
+    for guid, (name, count) in sorted(found.items(), key=lambda kv: -kv[1][1]):
+        print(f"  {count:>4}  {name}")
+        print(f"        org_id: {guid}")
+    return 0
+
+
+def _facet_counts(payload: dict, field: str) -> list[tuple[str, int]]:
+    """Pull `(value, count)` pairs out of a facet response.
+
+    Active has shipped more than one facet envelope over the years, so this
+    tolerates a couple of shapes rather than indexing blindly into one. An
+    unrecognised shape yields nothing, which prints as an empty section — a
+    visible non-answer, not a crash.
+    """
+    facets = payload.get("facets")
+    buckets: list[tuple[str, int]] = []
+
+    def absorb(node: object) -> None:
+        if isinstance(node, dict):
+            name = node.get("name") or node.get("value") or node.get("term")
+            count = node.get("count") or node.get("total")
+            if isinstance(name, str) and isinstance(count, int):
+                buckets.append((name, count))
+                return
+            for value in node.values():
+                absorb(value)
+        elif isinstance(node, list):
+            for item in node:
+                absorb(item)
+
+    absorb(facets)
+    if not buckets:
+        absorb(payload.get("facet_values"))
+    return sorted(buckets, key=lambda pair: -pair[1])
 
 
 def cmd_export(args: argparse.Namespace) -> int:
@@ -287,6 +451,36 @@ def build_parser() -> argparse.ArgumentParser:
         help="page to inspect; omit to survey every source in sources.yaml",
     )
     probe.set_defaults(func=cmd_probe)
+
+    discover = sub.add_parser(
+        "active-discover",
+        help="ask the ACTIVE API what it holds near a place (coverage check)",
+    )
+    _add_global_flags(discover, with_defaults=False)
+    discover.add_argument("--near", default="Decatur,GA,US", help="place to search around")
+    discover.add_argument("--radius", type=int, default=25, help="miles (default 25)")
+    discover.add_argument(
+        "--start-date",
+        default=None,
+        metavar="RANGE",
+        help="ACTIVE range, e.g. 2026-08-01..2027-08-31; omit to see everything",
+    )
+    discover.add_argument(
+        "--no-kids",
+        dest="kids",
+        action="store_false",
+        help="drop the kids=true filter (useful when a query returns nothing)",
+    )
+    discover.add_argument(
+        "--org-query",
+        default=None,
+        metavar="NAME",
+        help="look up organizationGuid values by name instead of showing facets",
+    )
+    discover.add_argument("--top", type=int, default=25, help="facet rows to show")
+    discover.add_argument("--delay", type=float, default=0.6, help="seconds between calls")
+    discover.add_argument("--api-key-env", default="ACTIVE_API_KEY", dest="api_key_env")
+    discover.set_defaults(func=cmd_active_discover, kids=True)
 
     export = sub.add_parser("export", help="write an .ics from current state")
     _add_global_flags(export, with_defaults=False)

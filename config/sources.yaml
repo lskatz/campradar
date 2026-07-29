@@ -104,6 +104,53 @@ sources:
     urls:
       - https://zooatlanta.org/programs/camps/
 
+  # --- ACTIVE Network API -------------------------------------------------
+  # These use the `activesearch` adapter, which reads the documented Activity
+  # Search API v2 rather than scraping. The key lives in $ACTIVE_API_KEY and
+  # must NEVER be written here: this file is committed to a public repo.
+  #
+  # Both are DISABLED until `campradar active-discover` confirms the API
+  # actually indexes them. It is unestablished whether ActiveNet municipal
+  # instances appear in this index at all, so dekalb-county in particular may
+  # return nothing no matter how the params are written. Verify, then enable:
+  #
+  #   export ACTIVE_API_KEY=...
+  #   campradar active-discover --near "Decatur,GA,US" --radius 25
+  #   campradar active-discover --org-query "Callanwolde"
+  #
+  # Then paste the organizationGuid into params.org_id below and flip enabled.
+  # Prefer org_id over a keyword query: ACTIVE re-titles assets, but the
+  # organisation GUID is the provider itself and does not drift.
+
+  - id: callanwolde-active
+    provider_slug: callanwolde
+    adapter: activesearch
+    enabled: false
+    params:
+      # org_id: <paste organizationGuid from active-discover --org-query>
+      near: Decatur,GA,US
+      radius: 25
+      query: Callanwolde
+      kids: "true"
+      exclude_children: "true"
+      start_date: 2026-08-01..2027-08-31
+      sort: date_asc
+
+  - id: dekalb-county-active
+    provider_slug: dekalb-county
+    adapter: activesearch
+    enabled: false
+    params:
+      # Keyword-based because no organizationGuid is known yet, and possibly
+      # unindexed entirely — see the note above.
+      near: Decatur,GA,US
+      radius: 20
+      query: DeKalb County Recreation
+      kids: "true"
+      exclude_children: "true"
+      start_date: 2026-08-01..2027-08-31
+      sort: date_asc
+
   # --- example ------------------------------------------------------------
   # Nine invented camps, served from this repo's own GitHub Pages deployment.
   # Enabled so that a fresh clone gets a dashboard with something on it, and
