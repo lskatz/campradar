@@ -140,12 +140,19 @@ def run_pipeline(
     state, delta = merge(previous, scraped, now=now)
     result.delta = delta
 
-    # Only persist when something actually worked. Writing an empty state after
+    # Only persist *state* when something worked. Writing an empty state after
     # a total failure would mark every real session as "disappeared" and then,
     # on recovery, as "new" — a false alert storm.
     if not result.is_total_failure:
         save_state(state_path, state)
-        _write_site_data(site_data_dir, state, breaks, providers, delta, now)
+
+    # But always publish the site data. On a total failure `state` still holds
+    # every prior session carried forward unchanged, so nothing is lost — and
+    # the run block must report the failure, or the dashboard would look
+    # perfectly healthy while quietly collecting nothing. A silently stale
+    # dashboard is the worst outcome here: it is indistinguishable from a
+    # working one right up until you miss a registration date.
+    _write_site_data(site_data_dir, state, breaks, providers, delta, now, result)
 
     return result
 
@@ -157,6 +164,7 @@ def _write_site_data(
     providers: dict[str, Provider],
     delta: DeltaReport,
     now: datetime,
+    result: "RunResult",
 ) -> None:
     """Emit the single JSON file the dashboard reads.
 
@@ -176,6 +184,15 @@ def _write_site_data(
 
     payload = {
         "generated_at": now.isoformat(),
+        # Run metadata, so the dashboard can tell an unconfigured install
+        # ("no sources enabled yet") apart from a broken one ("three sources
+        # failed"). Without this an empty page looks the same in both cases,
+        # which is exactly the wrong signal to give someone at 7am.
+        "run": {
+            "sources_ok": sorted(result.succeeded_sources),
+            "sources_failed": sorted(result.failed_sources),
+            "sessions_found": result.sessions_found,
+        },
         "breaks": [
             {"name": b.name, "start": b.start.isoformat(), "end": b.end.isoformat()}
             for b in breaks

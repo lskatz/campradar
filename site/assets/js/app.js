@@ -262,23 +262,88 @@ function renderSessions() {
   counter.textContent = `${sessions.length} shown`;
 
   if (sessions.length === 0) {
-    const empty = el("div", "empty");
-    empty.append(el("strong", null, "Nothing matches yet"));
-    empty.append(
-      document.createTextNode(
-        dataset.sessions.length === 0
-          ? "Run `campradar refresh` to pull in camp listings."
-          : "Widen the filters, or clear the selected break."
-      )
-    );
-    container.append(empty);
+    container.append(emptyState());
     return;
   }
 
   sessions.forEach((s) => container.append(sessionCard(s)));
 }
 
+/*
+ * Empty states are the most important copy on this page, because "no camps"
+ * has at least four causes and they need completely different responses. A
+ * single generic message would send someone hunting for a bug when they
+ * simply haven't enabled a source yet.
+ */
+function emptyState() {
+  const run = dataset.run || {};
+  const ok = run.sources_ok || [];
+  const failed = run.sources_failed || [];
+  const box = el("div", "empty");
+
+  // 1. Nothing configured. By far the most likely state on a fresh install.
+  if (ok.length === 0 && failed.length === 0) {
+    box.append(el("strong", null, "No sources are enabled yet"));
+    box.append(
+      document.createTextNode(
+        "Every source in config/sources.yaml ships disabled with a placeholder URL. " +
+          "Run `campradar probe <url>` on a provider's camp page, then set enabled: true. " +
+          "See docs/adding-a-source.md."
+      )
+    );
+    return box;
+  }
+
+  // 2. Sources ran but all of them broke.
+  if (ok.length === 0 && failed.length > 0) {
+    box.append(el("strong", null, `All ${failed.length} source(s) failed`));
+    box.append(document.createTextNode(`Failed: ${failed.join(", ")}. Check the Actions log.`));
+    return box;
+  }
+
+  // 3. Sources worked but genuinely returned nothing.
+  if (dataset.sessions.length === 0) {
+    box.append(el("strong", null, "Sources ran, but found no camps"));
+    box.append(
+      document.createTextNode(
+        `${ok.length} source(s) responded and returned zero sessions. ` +
+          "The listing page may have changed layout, or registration may not have opened yet."
+      )
+    );
+    return box;
+  }
+
+  // 4. Data exists; the filters are just too narrow.
+  box.append(el("strong", null, "Nothing matches your filters"));
+  box.append(
+    document.createTextNode(
+      `${dataset.sessions.length} camps are loaded. Clear the selected break, or remove a kid.`
+    )
+  );
+  return box;
+}
+
+/** Status line in the masthead: what the last run actually managed to do. */
+function renderRunStatus() {
+  const node = document.getElementById("run-status");
+  const run = dataset.run;
+  if (!run) {
+    node.textContent = "";
+    return;
+  }
+  const ok = (run.sources_ok || []).length;
+  const failed = (run.sources_failed || []).length;
+
+  if (ok === 0 && failed === 0) {
+    node.textContent = "no sources enabled";
+    return;
+  }
+  node.textContent =
+    `${ok} source${ok === 1 ? "" : "s"} ok` + (failed > 0 ? `, ${failed} failed` : "");
+}
+
 function render() {
+  renderRunStatus();
   renderGapChart();
   renderKids();
   renderSessions();
