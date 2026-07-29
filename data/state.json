@@ -1,4 +1,194 @@
 {
-  "generated_at": "2026-07-29T02:06:17.471040+00:00",
-  "sessions": []
+  "generated_at": "2026-07-29T22:34:15.717371+00:00",
+  "sessions": [
+    {
+      "key": "02edd0d88d84edd1",
+      "session": {
+        "provider_slug": "example-collective",
+        "title": "MLK Day Mini-Camp",
+        "start_date": "2027-01-18",
+        "end_date": "2027-01-18",
+        "min_age": 5,
+        "max_age": 12,
+        "daily_start": null,
+        "daily_end": null,
+        "price_usd": 65.0,
+        "registration_status": "open",
+        "registration_opens": null,
+        "url": "https://lskatz.github.io/campradar/example-camps.html#mlk-mini",
+        "description": "One full day of games, service projects and a film. Ages 5-12.",
+        "source_id": "example-camps"
+      },
+      "first_seen": "2026-07-29T22:34:10.082473Z",
+      "last_seen": "2026-07-29T22:34:10.082473Z"
+    },
+    {
+      "key": "08e8586dfc285e42",
+      "session": {
+        "provider_slug": "example-collective",
+        "title": "Mid-Winter Theater Intensive",
+        "start_date": "2027-02-15",
+        "end_date": "2027-02-19",
+        "min_age": 10,
+        "max_age": 15,
+        "daily_start": null,
+        "daily_end": null,
+        "price_usd": 395.0,
+        "registration_status": "not_yet_open",
+        "registration_opens": null,
+        "url": "https://lskatz.github.io/campradar/example-camps.html#theater",
+        "description": "Rehearse and stage a short play in one week. Ages 10-15.",
+        "source_id": "example-camps"
+      },
+      "first_seen": "2026-07-29T22:34:10.082473Z",
+      "last_seen": "2026-07-29T22:34:10.082473Z"
+    },
+    {
+      "key": "179755490d5c54d8",
+      "session": {
+        "provider_slug": "example-collective",
+        "title": "Fall Break Clay Studio",
+        "start_date": "2026-09-21",
+        "end_date": "2026-09-25",
+        "min_age": 8,
+        "max_age": 13,
+        "daily_start": null,
+        "daily_end": null,
+        "price_usd": 310.0,
+        "registration_status": "open",
+        "registration_opens": null,
+        "url": "https://lskatz.github.io/campradar/example-camps.html#clay-studio",
+        "description": "Hand-building and glazing, five half-days. Ages 8-13.",
+        "source_id": "example-camps"
+      },
+      "first_seen": "2026-07-29T22:34:10.082473Z",
+      "last_seen": "2026-07-29T22:34:10.082473Z"
+    },
+    {
+      "key": "1d7785f03d598124",
+      "session": {
+        "provider_slug": "example-collective",
+        "title": "Winter Break Telescope Nights",
+        "start_date": "2026-12-21",
+        "end_date": "2026-12-23",
+        "min_age": 9,
+        "max_age": 14,
+        "daily_start": null,
+        "daily_end": null,
+        "price_usd": 180.0,
+        "registration_status": "full",
+        "registration_opens": null,
+        "url": "https://lskatz.github.io/campradar/example-camps.html#telescope-nights",
+        "description": "Winter constellations and hot cocoa. Ages 9-14.",
+        "source_id": "example-camps"
+      },
+      "first_seen": "2026-07-29T22:34:10.082473Z",
+      "last_seen": "2026-07-29T22:34:10.082473Z"
+    },
+    {
+      "key": "8315104c03c4bd24",
+      "session": {
+        "provider_slug": "example-collective",
+        "title": "Spring Break Wilderness Skills",
+        "start_date": "2027-04-05",
+        "end_date": "2027-04-09",
+        "min_age": 7,
+        "max_age": 12,
+        "daily_start": null,
+        "daily_end": null,
+        "price_usd": 275.0,
+        "registration_status": "open",
+        "registration_opens": null,
+        "url": "https://lskatz.github.io/campradar/example-camps.html#wilderness",
+        "description": "Shelter, navigation and fire safety. Ages 7-12.",
+        "source_id": "example-camps"
+      },
+      "first_seen": "2026-07-29T22:34:10.082473Z",
+      "last_seen": "2026-07-29T22:34:10.082473Z"
+    },
+    {
+      "key": "add4ffa57c69b7be",
+      "session": {
+        "provider_slug": "example-collective",
+        "title": "Winter Break Coding Lab",
+        "start_date": "2026-12-28",
+        "end_date": "2026-12-31",
+        "min_age": 8,
+        "max_age": 10,
+        "daily_start": null,
+        "daily_end": null,
+        "price_usd": 340.0,
+        "registration_status": "open",
+        "registration_opens": null,
+        "url": "https://lskatz.github.io/campradar/example-camps.html#coding-lab",
+        "description": "Build a browser game from scratch. For rising grades 3-5.",
+        "source_id": "example-camps"
+      },
+      "first_seen": "2026-07-29T22:34:10.082473Z",
+      "last_seen": "2026-07-29T22:34:10.082473Z"
+    },
+    {
+      "key": "d0d7d53f54af9a2a",
+      "session": {
+        "provider_slug": "example-collective",
+        "title": "Summer Session One: Creek Ecology",
+        "start_date": "2027-06-07",
+        "end_date": "2027-06-11",
+        "min_age": 6,
+        "max_age": 10,
+        "daily_start": null,
+        "daily_end": null,
+        "price_usd": 250.0,
+        "registration_status": "open",
+        "registration_opens": null,
+        "url": "https://lskatz.github.io/campradar/example-camps.html#creek-ecology",
+        "description": "Macroinvertebrates, water chemistry and a lot of wet shoes. Ages 6-10.",
+        "source_id": "example-camps"
+      },
+      "first_seen": "2026-07-29T22:34:10.082473Z",
+      "last_seen": "2026-07-29T22:34:10.082473Z"
+    },
+    {
+      "key": "d23be853b01c8ecc",
+      "session": {
+        "provider_slug": "example-collective",
+        "title": "Fall Break Nature Detectives",
+        "start_date": "2026-09-21",
+        "end_date": "2026-09-25",
+        "min_age": 6,
+        "max_age": 11,
+        "daily_start": null,
+        "daily_end": null,
+        "price_usd": 225.0,
+        "registration_status": "open",
+        "registration_opens": null,
+        "url": "https://lskatz.github.io/campradar/example-camps.html#nature-detectives",
+        "description": "Track, sketch and identify what lives in the creek. Ages 6-11.",
+        "source_id": "example-camps"
+      },
+      "first_seen": "2026-07-29T22:34:10.082473Z",
+      "last_seen": "2026-07-29T22:34:10.082473Z"
+    },
+    {
+      "key": "f6b39af04a81f443",
+      "session": {
+        "provider_slug": "example-collective",
+        "title": "Thanksgiving Sports Sampler",
+        "start_date": "2026-11-23",
+        "end_date": "2026-11-25",
+        "min_age": 5,
+        "max_age": 10,
+        "daily_start": null,
+        "daily_end": null,
+        "price_usd": 135.0,
+        "registration_status": "open",
+        "registration_opens": null,
+        "url": "https://lskatz.github.io/campradar/example-camps.html#sports-sampler",
+        "description": "Three mornings of basketball, ultimate and dodgeball for ages 5-10.",
+        "source_id": "example-camps"
+      },
+      "first_seen": "2026-07-29T22:34:10.082473Z",
+      "last_seen": "2026-07-29T22:34:10.082473Z"
+    }
+  ]
 }
