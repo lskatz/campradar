@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-31T23:15:23.822314+00:00",
+  "generated_at": "2026-07-31T23:43:02.042401+00:00",
   "run": {
     "sources_ok": [
       "example-camps",
@@ -161,7 +161,7 @@
       "source_id": "tucker-rec",
       "key": "21f9ca8ae6f81655",
       "first_seen": "2026-07-31T23:06:44.612196+00:00",
-      "last_seen": "2026-07-31T23:15:23.822314+00:00",
+      "last_seen": "2026-07-31T23:43:02.042401+00:00",
       "is_new": false
     },
     {
@@ -181,7 +181,7 @@
       "source_id": "tucker-rec",
       "key": "b4001def0e5ecd19",
       "first_seen": "2026-07-31T23:06:44.612196+00:00",
-      "last_seen": "2026-07-31T23:15:23.822314+00:00",
+      "last_seen": "2026-07-31T23:43:02.042401+00:00",
       "is_new": false
     },
     {
@@ -201,7 +201,7 @@
       "source_id": "tucker-rec",
       "key": "652f7aebbc7d7dbb",
       "first_seen": "2026-07-31T23:06:44.612196+00:00",
-      "last_seen": "2026-07-31T23:15:23.822314+00:00",
+      "last_seen": "2026-07-31T23:43:02.042401+00:00",
       "is_new": false
     },
     {
@@ -221,7 +221,7 @@
       "source_id": "tucker-rec",
       "key": "f8862110de70b9b8",
       "first_seen": "2026-07-31T23:06:44.612196+00:00",
-      "last_seen": "2026-07-31T23:15:23.822314+00:00",
+      "last_seen": "2026-07-31T23:43:02.042401+00:00",
       "is_new": false
     },
     {
@@ -241,7 +241,7 @@
       "source_id": "tucker-rec",
       "key": "70a2de21f22064a9",
       "first_seen": "2026-07-31T23:06:44.612196+00:00",
-      "last_seen": "2026-07-31T23:15:23.822314+00:00",
+      "last_seen": "2026-07-31T23:43:02.042401+00:00",
       "is_new": false
     },
     {
@@ -261,7 +261,7 @@
       "source_id": "tucker-rec",
       "key": "c029eda41d99b750",
       "first_seen": "2026-07-31T23:06:44.612196+00:00",
-      "last_seen": "2026-07-31T23:15:23.822314+00:00",
+      "last_seen": "2026-07-31T23:43:02.042401+00:00",
       "is_new": false
     },
     {
@@ -281,7 +281,7 @@
       "source_id": "tucker-rec",
       "key": "7749fae94aeb87ca",
       "first_seen": "2026-07-31T23:06:44.612196+00:00",
-      "last_seen": "2026-07-31T23:15:23.822314+00:00",
+      "last_seen": "2026-07-31T23:43:02.042401+00:00",
       "is_new": false
     },
     {
@@ -301,7 +301,7 @@
       "source_id": "tucker-rec",
       "key": "de618b4cf4c85470",
       "first_seen": "2026-07-31T23:06:44.612196+00:00",
-      "last_seen": "2026-07-31T23:15:23.822314+00:00",
+      "last_seen": "2026-07-31T23:43:02.042401+00:00",
       "is_new": false
     },
     {
@@ -321,6 +321,26 @@
       "source_id": "tucker-rec",
       "key": "e288108714603353",
       "first_seen": "2026-07-31T23:06:44.612196+00:00",
+      "last_seen": "2026-07-31T23:43:02.042401+00:00",
+      "is_new": false
+    },
+    {
+      "provider_slug": "example-collective",
+      "title": "Fall Break Clay Studio",
+      "start_date": "2026-09-21",
+      "end_date": "2026-09-25",
+      "min_age": 8,
+      "max_age": 13,
+      "daily_start": null,
+      "daily_end": null,
+      "price_usd": 310.0,
+      "registration_status": "open",
+      "registration_opens": null,
+      "url": "https://lskatz.github.io/campradar/example-camps.html#clay-studio",
+      "description": "Hand-building and glazing, five half-days. Ages 8-13.",
+      "source_id": "example-camps",
+      "key": "179755490d5c54d8",
+      "first_seen": "2026-07-29T22:34:10.082473+00:00",
       "last_seen": "2026-07-31T23:15:23.822314+00:00",
       "is_new": false
     },
@@ -346,9 +366,29 @@
     },
     {
       "provider_slug": "example-collective",
+      "title": "Fall Break Nature Detectives",
+      "start_date": "2026-10-05",
+      "end_date": "2026-10-09",
+      "min_age": 6,
+      "max_age": 11,
+      "daily_start": null,
+      "daily_end": null,
+      "price_usd": 225.0,
+      "registration_status": "open",
+      "registration_opens": null,
+      "url": "https://lskatz.github.io/campradar/example-camps.html#nature-detectives",
+      "description": "Track, sketch and identify what lives in the creek. Ages 6-11.",
+      "source_id": "example-camps",
+      "key": "fab8c5b6c2e258f4",
+      "first_seen": "2026-07-31T23:38:47.432047+00:00",
+      "last_seen": "2026-07-31T23:43:02.042401+00:00",
+      "is_new": false
+    },
+    {
+      "provider_slug": "example-collective",
       "title": "Fall Break Clay Studio",
-      "start_date": "2026-09-21",
-      "end_date": "2026-09-25",
+      "start_date": "2026-10-05",
+      "end_date": "2026-10-09",
       "min_age": 8,
       "max_age": 13,
       "daily_start": null,
@@ -359,9 +399,9 @@
       "url": "https://lskatz.github.io/campradar/example-camps.html#clay-studio",
       "description": "Hand-building and glazing, five half-days. Ages 8-13.",
       "source_id": "example-camps",
-      "key": "179755490d5c54d8",
-      "first_seen": "2026-07-29T22:34:10.082473+00:00",
-      "last_seen": "2026-07-31T23:15:23.822314+00:00",
+      "key": "ac2bb52eec2f8186",
+      "first_seen": "2026-07-31T23:38:47.432047+00:00",
+      "last_seen": "2026-07-31T23:43:02.042401+00:00",
       "is_new": false
     },
     {
@@ -381,7 +421,7 @@
       "source_id": "example-camps",
       "key": "f6b39af04a81f443",
       "first_seen": "2026-07-29T22:34:10.082473+00:00",
-      "last_seen": "2026-07-31T23:15:23.822314+00:00",
+      "last_seen": "2026-07-31T23:43:02.042401+00:00",
       "is_new": false
     },
     {
@@ -401,7 +441,7 @@
       "source_id": "example-camps",
       "key": "1d7785f03d598124",
       "first_seen": "2026-07-29T22:34:10.082473+00:00",
-      "last_seen": "2026-07-31T23:15:23.822314+00:00",
+      "last_seen": "2026-07-31T23:43:02.042401+00:00",
       "is_new": false
     },
     {
@@ -421,7 +461,7 @@
       "source_id": "example-camps",
       "key": "add4ffa57c69b7be",
       "first_seen": "2026-07-29T22:34:10.082473+00:00",
-      "last_seen": "2026-07-31T23:15:23.822314+00:00",
+      "last_seen": "2026-07-31T23:43:02.042401+00:00",
       "is_new": false
     },
     {
@@ -441,7 +481,7 @@
       "source_id": "example-camps",
       "key": "02edd0d88d84edd1",
       "first_seen": "2026-07-29T22:34:10.082473+00:00",
-      "last_seen": "2026-07-31T23:15:23.822314+00:00",
+      "last_seen": "2026-07-31T23:43:02.042401+00:00",
       "is_new": false
     },
     {
@@ -461,7 +501,7 @@
       "source_id": "example-camps",
       "key": "08e8586dfc285e42",
       "first_seen": "2026-07-29T22:34:10.082473+00:00",
-      "last_seen": "2026-07-31T23:15:23.822314+00:00",
+      "last_seen": "2026-07-31T23:43:02.042401+00:00",
       "is_new": false
     },
     {
@@ -481,7 +521,7 @@
       "source_id": "example-camps",
       "key": "8315104c03c4bd24",
       "first_seen": "2026-07-29T22:34:10.082473+00:00",
-      "last_seen": "2026-07-31T23:15:23.822314+00:00",
+      "last_seen": "2026-07-31T23:43:02.042401+00:00",
       "is_new": false
     },
     {
@@ -501,7 +541,7 @@
       "source_id": "example-camps",
       "key": "d0d7d53f54af9a2a",
       "first_seen": "2026-07-29T22:34:10.082473+00:00",
-      "last_seen": "2026-07-31T23:15:23.822314+00:00",
+      "last_seen": "2026-07-31T23:43:02.042401+00:00",
       "is_new": false
     }
   ]
