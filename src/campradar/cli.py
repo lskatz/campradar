@@ -475,7 +475,13 @@ def cmd_recdesk_discover(args: argparse.Namespace) -> int:
     day RecDesk restyles, the diff shows exactly what moved instead of the
     suite going mysteriously red.
     """
-    from .adapters.recdesk import FILTER_PATH, parse_fragment, xhr_headers
+    from .adapters.recdesk import (
+        DATE_RANGE_PICK,
+        FILTER_PATH,
+        default_window,
+        parse_fragment,
+        xhr_headers,
+    )
 
     base_url = args.base_url.rstrip("/")
 
@@ -501,11 +507,19 @@ def cmd_recdesk_discover(args: argparse.Namespace) -> int:
         return 0
 
     categories = args.categories or ["9"]
+    window_from, window_to = default_window(date.today())
     body_template = {
         "ProgramName": "", "Code": "", "ProgramNameXS": "",
-        "DateRangeSelection": "", "DateRangeFrom": "", "DateRangeTo": "",
+        "DateRangeSelection": DATE_RANGE_PICK,
+        "DateRangeFrom": args.date_from or window_from,
+        "DateRangeTo": args.date_to or window_to,
         "ProgramType": "", "Age": "", "Facility": "0", "Days": "0",
-        "Pagination": {"CurrentPageIndex": 1, "LoadMore": True},
+        "ResultsPerPage": str(args.page_size),
+        "Pagination": {
+            "CurrentPageIndex": 1,
+            "PageSize": str(args.page_size),
+            "LoadMore": True,
+        },
     }
 
     with Fetcher(args.data / "raw", delay_seconds=args.delay) as fetcher:
@@ -551,7 +565,9 @@ def cmd_recdesk_discover(args: argparse.Namespace) -> int:
                 first_page = set(previous)
                 for page in range(2, args.pages + 1):
                     payload_n = {**payload, "Pagination": {
-                        "CurrentPageIndex": page, "LoadMore": True}}
+                        "CurrentPageIndex": page,
+                        "PageSize": str(args.page_size),
+                        "LoadMore": True}}
                     try:
                         more = fetcher.post_json(url, payload_n, headers=xhr_headers(referer))
                     except Exception as exc:  # noqa: BLE001

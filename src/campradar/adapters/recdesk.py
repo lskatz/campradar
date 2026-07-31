@@ -49,7 +49,7 @@ import logging
 import re
 from collections.abc import Iterator
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 from bs4 import BeautifulSoup
@@ -58,7 +58,14 @@ from ..fetch import Fetcher
 from ..models import CampSession, RegistrationStatus
 from .base import Adapter, AdapterError
 
-__all__ = ["RecDeskAdapter", "ProgramRow", "parse_fragment", "parse_date_range", "parse_age_range"]
+__all__ = [
+    "RecDeskAdapter",
+    "ProgramRow",
+    "parse_fragment",
+    "parse_date_range",
+    "parse_age_range",
+    "default_window",
+]
 
 log = logging.getLogger(__name__)
 
@@ -86,11 +93,45 @@ def xhr_headers(referer: str | None = None) -> dict[str, str]:
     return headers
 
 MAX_PAGES = 25
+DEFAULT_PAGE_SIZE = 25
+
+#: RecDesk's token for "use the explicit From/To dates". Without it the
+#: DateRangeFrom/DateRangeTo fields are ignored and the server applies its own
+#: default window -- which is how this source spent a while returning only the
+#: current week regardless of what dates were requested. The literal is not
+#: derivable from the rendered page; it came from capturing the portal's own
+#: request with the date filter set.
+DATE_RANGE_PICK = "pick"
 
 _DATE_RANGE = re.compile(r"(\d{1,2}/\d{1,2}/\d{4})\s*[-–]\s*(\d{1,2}/\d{1,2}/\d{4})")
 _SINGLE_DATE = re.compile(r"(\d{1,2}/\d{1,2}/\d{4})")
 #: "5y - 12y", "7y - 12y 0m", "5y 6m - 12y"
 _AGE_RANGE = re.compile(r"(\d{1,2})\s*y(?:\s*\d{1,2}\s*m)?\s*[-–]\s*(\d{1,2})\s*y", re.I)
+
+
+def default_window(today: date, *, months_ahead: int = 13) -> tuple[str, str]:
+    """A search window wide enough to span the school year, in RecDesk's format.
+
+        >>> default_window(date(2026, 7, 31))
+        ('07/31/2026', '08/31/2027')
+
+    Thirteen months rather than twelve so that the window always reaches the
+    far side of next summer's listings no matter when in the year it runs; a
+    twelve-month window opened in August stops just short of the following
+    August's camps, which is exactly when people start looking for them.
+
+        >>> default_window(date(2026, 12, 15))
+        ('12/15/2026', '01/31/2028')
+    """
+    end_month = today.month + months_ahead
+    end_year = today.year + (end_month - 1) // 12
+    end_month = (end_month - 1) % 12 + 1
+    # Last day of that month, found without a calendar dependency.
+    if end_month == 12:
+        last = date(end_year, 12, 31)
+    else:
+        last = date(end_year, end_month + 1, 1) - timedelta(days=1)
+    return today.strftime("%m/%d/%Y"), last.strftime("%m/%d/%Y")
 
 
 @dataclass(frozen=True)
@@ -291,21 +332,40 @@ class RecDeskAdapter(Adapter):
         ASP.NET fall back to session state, which is the behaviour this adapter
         exists to route around.
         """
+        page_size = int(self.config.get("page_size", DEFAULT_PAGE_SIZE))
+        date_from = self.config.get("date_from")
+        date_to = self.config.get("date_to")
+        if not (date_from and date_to):
+            date_from, date_to = default_window(self._today())
+
         body = {
             "ProgramName": "",
             "Code": "",
             "ProgramNameXS": "",
-            "DateRangeSelection": "",
-            "DateRangeFrom": "",
-            "DateRangeTo": "",
+            "DateRangeSelection": DATE_RANGE_PICK,
+            "DateRangeFrom": date_from,
+            "DateRangeTo": date_to,
             "ProgramType": str(category),
             "Age": "",
             "Facility": "0",
             "Days": "0",
-            "Pagination": {"CurrentPageIndex": page, "LoadMore": True},
+            # Both of these are in the portal's own request. ResultsPerPage
+            # sits at the top level and PageSize inside Pagination; sending
+            # neither is what made paging behave unpredictably.
+            "ResultsPerPage": str(page_size),
+            "Pagination": {
+                "CurrentPageIndex": page,
+                "PageSize": str(page_size),
+                "LoadMore": True,
+            },
         }
         body.update(self.config.get("params") or {})
         return body
+
+    def _today(self) -> date:
+        """Injectable clock, so the request body is reproducible under test."""
+        override = self.config.get("today")
+        return date.fromisoformat(override) if override else date.today()
 
     def parse(self, fetcher: Fetcher) -> Iterator[CampSession]:
         base_url = str(self.config.get("base_url") or "").rstrip("/")

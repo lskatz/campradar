@@ -279,3 +279,71 @@ class TestSessionPriming:
         adapter = RecDeskAdapter(CONFIG)
         with Fetcher(tmp_path / "raw", delay_seconds=0.0, client=client) as fetcher:
             assert adapter.run(fetcher), "should still have parsed the fragment"
+
+
+class TestBodyMatchesTheCapturedBrowserRequest:
+    """Pins the POST body against a real request copied from the portal.
+
+    This class exists because guessing cost four wrong diagnoses. The date
+    fields were being sent correctly the whole time and doing nothing, because
+    `DateRangeSelection` has to be the literal "pick" before RecDesk reads
+    them. That token appears nowhere in the rendered page -- it was only
+    recoverable by capturing the portal's own request -- so the defence against
+    losing it again is to assert it directly.
+    """
+
+    #: Keys observed in the captured request, verbatim.
+    CAPTURED_KEYS = {
+        "ProgramName", "Code", "ProgramNameXS", "DateRangeSelection",
+        "DateRangeFrom", "DateRangeTo", "ProgramType", "Age", "Facility",
+        "Days", "ResultsPerPage", "Pagination",
+    }
+
+    @staticmethod
+    def body(config=None):
+        import json
+
+        adapter = RecDeskAdapter({**CONFIG, "today": "2026-07-31", **(config or {})})
+        return json.loads(json.dumps(adapter._body("9", 1)))
+
+    def test_every_captured_key_is_present(self):
+        assert set(self.body()) >= self.CAPTURED_KEYS
+
+    def test_the_date_range_selection_is_the_pick_token(self):
+        """The whole bug in one assertion."""
+        assert self.body()["DateRangeSelection"] == "pick"
+
+    def test_pagination_carries_a_page_size(self):
+        pagination = self.body()["Pagination"]
+        assert pagination["PageSize"] == "25"
+        assert pagination["CurrentPageIndex"] == 1
+        assert pagination["LoadMore"] is True
+
+    def test_results_per_page_is_sent_at_the_top_level_too(self):
+        """It appears in both places in the capture; send it in both."""
+        assert self.body()["ResultsPerPage"] == "25"
+
+    def test_dates_are_in_recdesks_us_format(self):
+        import re
+
+        body = self.body()
+        for field in ("DateRangeFrom", "DateRangeTo"):
+            assert re.fullmatch(r"\d{2}/\d{2}/\d{4}", body[field]), body[field]
+
+    def test_the_default_window_spans_the_school_year(self):
+        body = self.body()
+        assert body["DateRangeFrom"] == "07/31/2026"
+        assert body["DateRangeTo"] == "08/31/2027"
+
+    def test_explicit_dates_win_over_the_default_window(self):
+        body = self.body({"date_from": "08/08/2026", "date_to": "07/02/2027"})
+        assert body["DateRangeFrom"] == "08/08/2026"
+        assert body["DateRangeTo"] == "07/02/2027"
+
+    def test_params_can_still_override_anything(self):
+        assert self.body({"params": {"Age": "8"}})["Age"] == "8"
+
+    def test_page_size_is_configurable_and_lands_in_both_places(self):
+        body = self.body({"page_size": 50})
+        assert body["ResultsPerPage"] == "50"
+        assert body["Pagination"]["PageSize"] == "50"
