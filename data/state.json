@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-31T01:21:56.771552+00:00",
+  "generated_at": "2026-07-31T23:06:50.932846+00:00",
   "sessions": [
     {
       "key": "02edd0d88d84edd1",
@@ -20,7 +20,7 @@
         "source_id": "example-camps"
       },
       "first_seen": "2026-07-29T22:34:10.082473Z",
-      "last_seen": "2026-07-31T01:21:50.561759Z"
+      "last_seen": "2026-07-31T23:06:44.612196Z"
     },
     {
       "key": "08e8586dfc285e42",
@@ -41,7 +41,7 @@
         "source_id": "example-camps"
       },
       "first_seen": "2026-07-29T22:34:10.082473Z",
-      "last_seen": "2026-07-31T01:21:50.561759Z"
+      "last_seen": "2026-07-31T23:06:44.612196Z"
     },
     {
       "key": "179755490d5c54d8",
@@ -62,7 +62,7 @@
         "source_id": "example-camps"
       },
       "first_seen": "2026-07-29T22:34:10.082473Z",
-      "last_seen": "2026-07-31T01:21:50.561759Z"
+      "last_seen": "2026-07-31T23:06:44.612196Z"
     },
     {
       "key": "1d7785f03d598124",
@@ -83,7 +83,91 @@
         "source_id": "example-camps"
       },
       "first_seen": "2026-07-29T22:34:10.082473Z",
-      "last_seen": "2026-07-31T01:21:50.561759Z"
+      "last_seen": "2026-07-31T23:06:44.612196Z"
+    },
+    {
+      "key": "21f9ca8ae6f81655",
+      "session": {
+        "provider_slug": "tucker-rec",
+        "title": "Summer Camp Aftercare July 27-31",
+        "start_date": "2026-07-27",
+        "end_date": "2026-07-31",
+        "min_age": 5,
+        "max_age": 12,
+        "daily_start": null,
+        "daily_end": null,
+        "price_usd": null,
+        "registration_status": "full",
+        "registration_opens": null,
+        "url": "https://tucker.recdesk.com/Community/Program/Detail?programId=1813",
+        "description": null,
+        "source_id": "tucker-rec"
+      },
+      "first_seen": "2026-07-31T23:06:44.612196Z",
+      "last_seen": "2026-07-31T23:06:44.612196Z"
+    },
+    {
+      "key": "652f7aebbc7d7dbb",
+      "session": {
+        "provider_slug": "tucker-rec",
+        "title": "100 - Imagination Adventure Camp",
+        "start_date": "2026-07-27",
+        "end_date": "2026-07-31",
+        "min_age": 5,
+        "max_age": 12,
+        "daily_start": null,
+        "daily_end": null,
+        "price_usd": null,
+        "registration_status": "full",
+        "registration_opens": null,
+        "url": "https://tucker.recdesk.com/Community/Program/Detail?programId=1618",
+        "description": null,
+        "source_id": "tucker-rec"
+      },
+      "first_seen": "2026-07-31T23:06:44.612196Z",
+      "last_seen": "2026-07-31T23:06:44.612196Z"
+    },
+    {
+      "key": "70a2de21f22064a9",
+      "session": {
+        "provider_slug": "tucker-rec",
+        "title": "100 - Superhero Academy",
+        "start_date": "2026-07-27",
+        "end_date": "2026-07-31",
+        "min_age": 5,
+        "max_age": 12,
+        "daily_start": null,
+        "daily_end": null,
+        "price_usd": null,
+        "registration_status": "full",
+        "registration_opens": null,
+        "url": "https://tucker.recdesk.com/Community/Program/Detail?programId=1641",
+        "description": null,
+        "source_id": "tucker-rec"
+      },
+      "first_seen": "2026-07-31T23:06:44.612196Z",
+      "last_seen": "2026-07-31T23:06:44.612196Z"
+    },
+    {
+      "key": "7749fae94aeb87ca",
+      "session": {
+        "provider_slug": "tucker-rec",
+        "title": "100 - Camp Tucker - Session 2",
+        "start_date": "2026-07-27",
+        "end_date": "2026-07-31",
+        "min_age": 5,
+        "max_age": 12,
+        "daily_start": null,
+        "daily_end": null,
+        "price_usd": null,
+        "registration_status": "full",
+        "registration_opens": null,
+        "url": "https://tucker.recdesk.com/Community/Program/Detail?programId=1664",
+        "description": null,
+        "source_id": "tucker-rec"
+      },
+      "first_seen": "2026-07-31T23:06:44.612196Z",
+      "last_seen": "2026-07-31T23:06:44.612196Z"
     },
     {
       "key": "8315104c03c4bd24",
@@ -104,7 +188,7 @@
         "source_id": "example-camps"
       },
       "first_seen": "2026-07-29T22:34:10.082473Z",
-      "last_seen": "2026-07-31T01:21:50.561759Z"
+      "last_seen": "2026-07-31T23:06:44.612196Z"
     },
     {
       "key": "add4ffa57c69b7be",
@@ -125,7 +209,49 @@
         "source_id": "example-camps"
       },
       "first_seen": "2026-07-29T22:34:10.082473Z",
-      "last_seen": "2026-07-31T01:21:50.561759Z"
+      "last_seen": "2026-07-31T23:06:44.612196Z"
+    },
+    {
+      "key": "b4001def0e5ecd19",
+      "session": {
+        "provider_slug": "tucker-rec",
+        "title": "100 - Eco Adventure Camp: Rainforest Expedition",
+        "start_date": "2026-07-27",
+        "end_date": "2026-07-31",
+        "min_age": 5,
+        "max_age": 12,
+        "daily_start": null,
+        "daily_end": null,
+        "price_usd": null,
+        "registration_status": "full",
+        "registration_opens": null,
+        "url": "https://tucker.recdesk.com/Community/Program/Detail?programId=1674",
+        "description": null,
+        "source_id": "tucker-rec"
+      },
+      "first_seen": "2026-07-31T23:06:44.612196Z",
+      "last_seen": "2026-07-31T23:06:44.612196Z"
+    },
+    {
+      "key": "c029eda41d99b750",
+      "session": {
+        "provider_slug": "tucker-rec",
+        "title": "100 - 50 Sports Summer Camp - Flag Football",
+        "start_date": "2026-07-27",
+        "end_date": "2026-07-31",
+        "min_age": 5,
+        "max_age": 12,
+        "daily_start": null,
+        "daily_end": null,
+        "price_usd": null,
+        "registration_status": "full",
+        "registration_opens": null,
+        "url": "https://tucker.recdesk.com/Community/Program/Detail?programId=1650",
+        "description": null,
+        "source_id": "tucker-rec"
+      },
+      "first_seen": "2026-07-31T23:06:44.612196Z",
+      "last_seen": "2026-07-31T23:06:44.612196Z"
     },
     {
       "key": "d0d7d53f54af9a2a",
@@ -146,7 +272,7 @@
         "source_id": "example-camps"
       },
       "first_seen": "2026-07-29T22:34:10.082473Z",
-      "last_seen": "2026-07-31T01:21:50.561759Z"
+      "last_seen": "2026-07-31T23:06:44.612196Z"
     },
     {
       "key": "d23be853b01c8ecc",
@@ -167,7 +293,49 @@
         "source_id": "example-camps"
       },
       "first_seen": "2026-07-29T22:34:10.082473Z",
-      "last_seen": "2026-07-31T01:21:50.561759Z"
+      "last_seen": "2026-07-31T23:06:44.612196Z"
+    },
+    {
+      "key": "de618b4cf4c85470",
+      "session": {
+        "provider_slug": "tucker-rec",
+        "title": "100 - Camp Tucker Week 8 Around the World Celebration",
+        "start_date": "2026-07-27",
+        "end_date": "2026-07-31",
+        "min_age": 5,
+        "max_age": 12,
+        "daily_start": null,
+        "daily_end": null,
+        "price_usd": null,
+        "registration_status": "full",
+        "registration_opens": null,
+        "url": "https://tucker.recdesk.com/Community/Program/Detail?programId=1665",
+        "description": null,
+        "source_id": "tucker-rec"
+      },
+      "first_seen": "2026-07-31T23:06:44.612196Z",
+      "last_seen": "2026-07-31T23:06:44.612196Z"
+    },
+    {
+      "key": "e288108714603353",
+      "session": {
+        "provider_slug": "tucker-rec",
+        "title": "Teen Camp Week 8 July (27th)",
+        "start_date": "2026-07-27",
+        "end_date": "2026-07-31",
+        "min_age": 13,
+        "max_age": 15,
+        "daily_start": null,
+        "daily_end": null,
+        "price_usd": null,
+        "registration_status": "full",
+        "registration_opens": null,
+        "url": "https://tucker.recdesk.com/Community/Program/Detail?programId=1778",
+        "description": null,
+        "source_id": "tucker-rec"
+      },
+      "first_seen": "2026-07-31T23:06:44.612196Z",
+      "last_seen": "2026-07-31T23:06:44.612196Z"
     },
     {
       "key": "f6b39af04a81f443",
@@ -188,7 +356,28 @@
         "source_id": "example-camps"
       },
       "first_seen": "2026-07-29T22:34:10.082473Z",
-      "last_seen": "2026-07-31T01:21:50.561759Z"
+      "last_seen": "2026-07-31T23:06:44.612196Z"
+    },
+    {
+      "key": "f8862110de70b9b8",
+      "session": {
+        "provider_slug": "tucker-rec",
+        "title": "100 - Smart Tech Playground",
+        "start_date": "2026-07-27",
+        "end_date": "2026-07-31",
+        "min_age": 5,
+        "max_age": 12,
+        "daily_start": null,
+        "daily_end": null,
+        "price_usd": null,
+        "registration_status": "full",
+        "registration_opens": null,
+        "url": "https://tucker.recdesk.com/Community/Program/Detail?programId=1631",
+        "description": null,
+        "source_id": "tucker-rec"
+      },
+      "first_seen": "2026-07-31T23:06:44.612196Z",
+      "last_seen": "2026-07-31T23:06:44.612196Z"
     }
   ]
 }
