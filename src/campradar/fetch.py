@@ -83,7 +83,7 @@ class Fetcher:
 
     # -- context manager ---------------------------------------------------
 
-    def __enter__(self) -> "Fetcher":
+    def __enter__(self) -> Fetcher:
         return self
 
     def __exit__(self, *exc_info: object) -> None:

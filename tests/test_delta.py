@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime
 
-from campradar.delta import merge, save_state, load_state
+from campradar.delta import load_state, merge, save_state
 from campradar.models import CampSession, RegistrationStatus
 
 RUN_ONE = datetime(2026, 9, 1, 12, 0, tzinfo=UTC)

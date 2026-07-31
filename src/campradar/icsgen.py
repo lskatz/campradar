@@ -12,7 +12,7 @@ produced by `campradar export`.
 from __future__ import annotations
 
 from collections.abc import Iterable
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 
 from .models import CampSession
 
@@ -89,7 +89,7 @@ def _all_day_event(session: CampSession, stamp: str) -> list[str]:
 
 def render_calendar(sessions: Iterable[CampSession], *, name: str = "Camp Radar") -> str:
     """Render sessions as an iCalendar document with CRLF line endings."""
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     lines = [
         "BEGIN:VCALENDAR",
         "VERSION:2.0",

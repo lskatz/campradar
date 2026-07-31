@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from .models import CampSession, RegistrationStatus, SessionRecord
@@ -72,7 +72,7 @@ def merge(
     Note that records absent from `scraped` are *retained* with their old
     `last_seen`. See `SessionRecord.is_stale` for why we don't delete.
     """
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     report = DeltaReport()
     merged: dict[str, SessionRecord] = {}
 
@@ -180,7 +180,7 @@ def save_state(path: Path, state: dict[str, SessionRecord]) -> None:
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "sessions": [
             json.loads(state[key].model_dump_json()) for key in sorted(state)
         ],

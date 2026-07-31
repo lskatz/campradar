@@ -23,7 +23,7 @@ import hashlib
 import re
 import unicodedata
 from datetime import date, datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
@@ -75,7 +75,7 @@ def _title_fingerprint(title: str) -> str:
 # --------------------------------------------------------------------------
 
 
-class RegistrationStatus(str, Enum):
+class RegistrationStatus(StrEnum):
     """How reachable a session is right now.
 
     `UNKNOWN` is the honest default and by far the most common value. Most
@@ -113,7 +113,7 @@ class Provider(BaseModel):
     longitude: float | None = Field(default=None, ge=-180, le=180)
 
     @model_validator(mode="after")
-    def _coords_come_in_pairs(self) -> "Provider":
+    def _coords_come_in_pairs(self) -> Provider:
         if (self.latitude is None) != (self.longitude is None):
             raise ValueError("latitude and longitude must be provided together")
         return self
@@ -155,7 +155,7 @@ class CampSession(BaseModel):
     source_id: str = Field(description="Which adapter/source produced this record.")
 
     @model_validator(mode="after")
-    def _check_ranges(self) -> "CampSession":
+    def _check_ranges(self) -> CampSession:
         if self.end_date < self.start_date:
             raise ValueError(f"end_date {self.end_date} precedes start_date {self.start_date}")
         if self.min_age is not None and self.max_age is not None and self.max_age < self.min_age:
@@ -171,7 +171,10 @@ class CampSession(BaseModel):
         one. Including them would make every price tweak look like a brand-new
         camp and flood the "New this week" panel with noise.
         """
-        material = f"{self.provider_slug}|{_title_fingerprint(self.title)}|{self.start_date.isoformat()}"
+        material = (
+            f"{self.provider_slug}|{_title_fingerprint(self.title)}"
+            f"|{self.start_date.isoformat()}"
+        )
         return hashlib.sha256(material.encode("utf-8")).hexdigest()[:16]
 
     @property
@@ -192,7 +195,7 @@ class CampSession(BaseModel):
         """
         if self.min_age is not None and age < self.min_age:
             return False
-        if self.max_age is not None and age > self.max_age:
+        if self.max_age is not None and age > self.max_age:  # noqa: SIM103
             return False
         return True
 
