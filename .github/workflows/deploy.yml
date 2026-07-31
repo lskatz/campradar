@@ -8,9 +8,10 @@
 # something a human reviewed, and Actions never needs network access to
 # providers, write access to the repo, or a schedule.
 #
-# If you would rather have CI do the scraping on a timer, see
-# .github/workflows/refresh.yml.disabled — it works, it just needs the site to
-# be its own state store, which is a more moving parts than most people want.
+# There is intentionally no scheduled scraping workflow. Collection on a timer
+# would need the deployment to be its own state store (hydrating first_seen
+# from the published sessions.json), and it would publish data nobody looked
+# at. `refresh --previous-url` exists if that is ever wanted.
 
 name: Deploy site
 

@@ -375,6 +375,89 @@ def _facet_counts(payload: dict, field: str) -> list[tuple[str, int]]:
     return sorted(buckets, key=lambda pair: -pair[1])
 
 
+#: ACTIVE's own published example, verbatim from the Activity Search v2 docs,
+#: minus their demo key. It is the control: if this fails with your key, the
+#: fault is not in anything this repo controls.
+DOCUMENTED_SAMPLE = {
+    "query": "running",
+    "category": "event",
+    "near": "San Diego,CA,US",
+    "radius": 50,
+}
+
+
+def cmd_active_doctor(args: argparse.Namespace) -> int:
+    """Classify why ACTIVE is refusing, by running a control call beside ours.
+
+    `active-discover` answers "what does ACTIVE hold near me". This answers the
+    prior question — "is this key able to read ACTIVE at all" — which discover
+    conflates with an empty result set and the adapter reports as a generic
+    source failure.
+
+    Deliberately does not use `Fetcher`: no caching (a cached 403 is worse than
+    useless), no shared delay, and both http and https are tried because
+    ACTIVE's documentation shows http and their gateway has not always behaved
+    identically across the two.
+    """
+    import httpx
+
+    from .doctor import classify, interpret
+
+    api_key = os.environ.get(args.api_key_env, "").strip()
+    if not api_key:
+        print(
+            f"${args.api_key_env} is not set — nothing to diagnose.\n"
+            f"  export {args.api_key_env}=...",
+            file=sys.stderr,
+        )
+        return 1
+
+    ours = {"near": args.near, "radius": args.radius, "kids": "true", "per_page": 1}
+
+    print(f"ACTIVE doctor — key ${args.api_key_env}, {len(api_key)} chars")
+    print("=" * 68)
+
+    results = {}
+    for label, params in (("documented sample", DOCUMENTED_SAMPLE), ("campradar query", ours)):
+        best = None
+        for scheme in ("https", "http"):
+            base = args.api_base or f"{scheme}://api.amp.active.com/v2/search"
+            if args.api_base and scheme == "http":
+                break  # an explicit override is used exactly as given
+            url = build_search_url(params, api_key, base)
+            try:
+                response = httpx.get(url, timeout=20.0, follow_redirects=True)
+            except httpx.HTTPError as exc:
+                print(f"\n{label} [{scheme}]: transport error — {redact(exc)}")
+                continue
+            diagnosis = classify(
+                response.status_code, dict(response.headers), response.text
+            )
+            shown = base.split(":", 1)[0] if args.api_base else scheme
+            print(f"\n{label} [{shown}]: HTTP {diagnosis.status} -> {diagnosis.verdict.value}")
+            if diagnosis.mashery_code or diagnosis.detail:
+                print(f"  gateway: {diagnosis.mashery_code} {diagnosis.detail}".rstrip())
+            if diagnosis.total_results is not None:
+                print(f"  total_results: {diagnosis.total_results}")
+            if not diagnosis.ok and diagnosis.excerpt:
+                excerpt = redact(diagnosis.excerpt).replace("\n", " ")[:200]
+                print(f"  body: {excerpt}")
+            print(f"  next: {diagnosis.next_step}")
+            if best is None or diagnosis.ok:
+                best = diagnosis
+            if diagnosis.ok:
+                break
+        if best is not None:
+            results[label] = best
+
+    print("\n" + "=" * 68)
+    if len(results) == 2:
+        print(interpret(results["documented sample"], results["campradar query"]))
+        return 0 if results["campradar query"].ok else 2
+    print("Could not reach ACTIVE at all. Check connectivity or a proxy.")
+    return 2
+
+
 def cmd_tribe_discover(args: argparse.Namespace) -> int:
     """Report what is actually in a site's Events Calendar.
 
@@ -542,7 +625,7 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "read prior state from a published sessions.json instead of "
             "data/state.json. Lets CI track changes without commit access; "
-            "e.g. https://USER.github.io/camp-radar/assets/data/sessions.json"
+            "e.g. https://USER.github.io/campradar/assets/data/sessions.json"
         ),
     )
     refresh.set_defaults(func=cmd_refresh)
@@ -592,6 +675,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="override the endpoint, to test against a fixture server",
     )
     discover.set_defaults(func=cmd_active_discover, kids=True)
+
+    doctor = sub.add_parser(
+        "active-doctor",
+        help="find out whether your ACTIVE key can read the API at all",
+    )
+    _add_global_flags(doctor, with_defaults=False)
+    doctor.add_argument("--near", default="Decatur,GA,US")
+    doctor.add_argument("--radius", type=int, default=25)
+    doctor.add_argument("--api-key-env", default="ACTIVE_API_KEY", dest="api_key_env")
+    doctor.add_argument(
+        "--api-base", default=None, metavar="URL",
+        help="override the endpoint, to test against a fixture server",
+    )
+    doctor.set_defaults(func=cmd_active_doctor)
 
     tribe = sub.add_parser(
         "tribe-discover",

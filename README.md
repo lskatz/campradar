@@ -32,8 +32,8 @@ protect. Full reasoning in [docs/privacy.md](docs/privacy.md).
 ## Quick start
 
 ```bash
-git clone https://github.com/lskatz/camp-radar
-cd camp-radar
+git clone https://github.com/lskatz/campradar
+cd campradar
 pip install -e ".[dev]"
 pytest -q                                  # 77 tests, ~1s
 
@@ -106,17 +106,22 @@ Pass a single URL to probe just that page: `campradar probe https://...`.
 
 ### If you'd rather CI did the scraping
 
-`.github/workflows/refresh.yml.disabled` is a working scheduled version. It
-never writes to the repo either — it hydrates prior state from the published
-`sessions.json` via `--previous-url`, making the deployment its own state
-store. Rename it to `.yml` to enable, and drop `deploy.yml`.
+There is deliberately no scheduled scraping workflow in this repo. `deploy.yml`
+is the only workflow: it runs the tests, checks the site has data, and publishes
+`site/`. It has no schedule, no provider network access, and `contents: read` —
+it cannot write to the repository even by accident.
+
+That is the property worth keeping. Because collection happens on your machine,
+every published change passed through a diff you looked at, and a provider
+changing their HTML breaks a command you ran on purpose rather than a cron job
+you find out about three weeks later.
 
 ## Reading the data directly
 
 The published file is public and CORS-open:
 
 ```bash
-URL=https://lskatz.github.io/camp-radar/assets/data/sessions.json
+URL=https://lskatz.github.io/campradar/assets/data/sessions.json
 
 # how many camps, and how the last run went
 curl -s $URL | python3 -c "import json,sys; d=json.load(sys.stdin); print(len(d['sessions']),'sessions'); print(d['run'])"
@@ -137,6 +142,7 @@ The same snippets appear on the site itself, with the URL filled in.
 | `make doctor` | Diagnose which copy of the code is running |
 | `campradar refresh` | Fetch all enabled sources, update state, write site data |
 | `campradar probe [url]` | Probe one page, or every configured source |
+| `campradar active-doctor` | Find out whether your ACTIVE key can read the API at all |
 | `campradar export -o camps.ics` | Write an `.ics` from current state |
 
 ## Layout
