@@ -511,6 +511,15 @@ def cmd_recdesk_discover(args: argparse.Namespace) -> int:
     with Fetcher(args.data / "raw", delay_seconds=args.delay) as fetcher:
         for category in categories:
             payload = {**body_template, "ProgramType": str(category)}
+            if args.date_range_selection is not None:
+                payload["DateRangeSelection"] = args.date_range_selection
+            if args.date_from:
+                payload["DateRangeFrom"] = args.date_from
+            if args.date_to:
+                payload["DateRangeTo"] = args.date_to
+            for item in args.param or []:
+                key, _, value = item.partition("=")
+                payload[key] = value
             url = f"{base_url}{FILTER_PATH}"
             try:
                 result = fetcher.post_json(url, payload, headers=XHR_HEADERS)
@@ -551,12 +560,24 @@ def cmd_recdesk_discover(args: argparse.Namespace) -> int:
                         print(f"    page {page}: empty — end of results")
                         break
                     if titles == first_page:
-                        print(
-                            f"    page {page}: IDENTICAL to page 1 ({len(titles)} rows).\n"
-                            f"      The server is ignoring CurrentPageIndex. Paging by index\n"
-                            f"      does not work here; the adapter is only ever seeing the\n"
-                            f"      first page, which is the earliest dates."
-                        )
+                        # Ambiguous, and saying so matters: a server that
+                        # clamps an out-of-range index returns page 1 again,
+                        # which is correct when there is only one page. Only a
+                        # *full* page 1 makes a repeat suspicious.
+                        if len(first_page) >= args.page_size:
+                            print(
+                                f"    page {page}: identical to page 1, and page 1 was full\n"
+                                f"      ({len(titles)} rows >= --page-size). The server is likely\n"
+                                f"      ignoring CurrentPageIndex."
+                            )
+                        else:
+                            print(
+                                f"    page {page}: identical to page 1, but page 1 held only\n"
+                                f"      {len(titles)} row(s) — under one page. That is what a\n"
+                                f"      single-page result set looks like, NOT a paging bug.\n"
+                                f"      If the sidebar claims many more, the filter is the\n"
+                                f"      problem: try --date-range-selection / --date-from."
+                            )
                         break
                     fresh = titles - previous
                     print(f"    page {page}: {len(page_rows)} rows, {len(fresh)} new, {span}")
@@ -955,6 +976,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="write each raw fragment to tests/fixtures/ as a recorded contract",
     )
     recdesk.add_argument("--top", type=int, default=25, help="rows to show")
+    recdesk.add_argument(
+        "--date-range-selection", default=None, metavar="VALUE",
+        help="value for DateRangeSelection; empty string is RecDesk's default (This Week)",
+    )
+    recdesk.add_argument("--date-from", default=None, metavar="MM/DD/YYYY")
+    recdesk.add_argument("--date-to", default=None, metavar="MM/DD/YYYY")
+    recdesk.add_argument(
+        "--param", action="append", metavar="KEY=VALUE",
+        help="override any other body field; repeatable",
+    )
+    recdesk.add_argument(
+        "--page-size", type=int, default=25, metavar="N",
+        help="rows per page, used to judge whether a repeated page is suspicious",
+    )
     recdesk.add_argument(
         "--pages", type=int, default=1, metavar="N",
         help="walk N pages and report whether paging actually advances",
