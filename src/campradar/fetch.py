@@ -115,6 +115,36 @@ class Fetcher:
 
     # -- public API --------------------------------------------------------
 
+    def post_json(
+        self, url: str, payload: dict, *, headers: dict[str, str] | None = None
+    ) -> FetchResult:
+        """POST a JSON body and return the response.
+
+        Conditional caching does not apply: a POST is a query, and servers that
+        answer one do not send ETags for it. The body is still written to the
+        cache directory, because the raw snapshot is what lets a parser bug be
+        fixed and re-run without touching the network — the same reason `get`
+        keeps one.
+
+        Cache key includes the payload, so two different filters do not
+        overwrite each other's snapshot.
+        """
+        key = f"{url}|{json.dumps(payload, sort_keys=True)}"
+        body_path, meta_path = self._cache_paths(key)
+
+        self._throttle(url)
+        response = self._client.post(url, json=payload, headers=headers or {})
+        response.raise_for_status()
+
+        body_path.write_text(response.text, encoding="utf-8")
+        meta_path.write_text(
+            json.dumps({"url": redact(url), "payload": redact(json.dumps(payload))}),
+            encoding="utf-8",
+        )
+        return FetchResult(
+            url=url, text=response.text, from_cache=False, status_code=response.status_code
+        )
+
     def get(self, url: str) -> FetchResult:
         """Fetch a URL, using a conditional request when we have it cached.
 

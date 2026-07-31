@@ -8,12 +8,14 @@ adding a source is a config change plus (sometimes) one new module.
 from .activesearch import ActiveSearchAdapter
 from .base import Adapter, AdapterError
 from .jsonld import JsonLdAdapter
+from .recdesk import RecDeskAdapter
 from .tribe import TribeEventsAdapter
 
 #: Maps the `adapter:` field in sources.yaml to an implementation.
 REGISTRY: dict[str, type[Adapter]] = {
     "activesearch": ActiveSearchAdapter,
     "jsonld": JsonLdAdapter,
+    "recdesk": RecDeskAdapter,
     "tribe": TribeEventsAdapter,
 }
 
@@ -22,6 +24,7 @@ __all__ = [
     "Adapter",
     "AdapterError",
     "JsonLdAdapter",
+    "RecDeskAdapter",
     "REGISTRY",
     "TribeEventsAdapter",
 ]

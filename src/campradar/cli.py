@@ -18,10 +18,13 @@ import argparse
 import json
 import logging
 import os
+import re
 import sys
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
+
+from bs4 import BeautifulSoup
 
 from .adapters.activesearch import api_base, build_search_url
 from .adapters.jsonld import extract_jsonld_objects, is_event
@@ -458,6 +461,90 @@ def cmd_active_doctor(args: argparse.Namespace) -> int:
     return 2
 
 
+def cmd_recdesk_discover(args: argparse.Namespace) -> int:
+    """Report what a RecDesk portal's FilterPrograms endpoint actually returns.
+
+    Same purpose as `active-discover` and `tribe-discover`: find out before
+    building. RecDesk is worse than most in this respect, because the visible
+    page lies — the programme table is empty in the served HTML and the sidebar
+    counts shift between requests, since the filter is session state. The only
+    way to know what a category holds is to post the filter yourself.
+
+    `--save` writes the raw fragment to tests/fixtures/. That matters more than
+    it looks: it turns the adapter's contract into a recorded artefact, so the
+    day RecDesk restyles, the diff shows exactly what moved instead of the
+    suite going mysteriously red.
+    """
+    from .adapters.recdesk import FILTER_PATH, XHR_HEADERS, parse_fragment
+
+    base_url = args.base_url.rstrip("/")
+
+    print(f"RecDesk portal at {base_url}")
+
+    if args.list_categories:
+        with Fetcher(args.data / "raw", delay_seconds=args.delay) as fetcher:
+            page = fetcher.get(f"{base_url}/Community/Program").text
+        soup = BeautifulSoup(page, "html.parser")
+        seen: dict[str, str] = {}
+        for anchor in soup.find_all("a", href=True):
+            match = re.search(r"[?&]category=(\d+)", str(anchor["href"]))
+            if match:
+                label = anchor.get_text(" ", strip=True)
+                seen.setdefault(match.group(1), label)
+        print("\ncategories (id: label as shown in the sidebar)")
+        for cid, label in sorted(seen.items(), key=lambda kv: int(kv[0])):
+            print(f"  {cid:>4}: {label}")
+        print(
+            "\nNote: the counts in those labels are session state and change "
+            "between\nrequests. Trust the POST below, not the sidebar."
+        )
+        return 0
+
+    categories = args.categories or ["9"]
+    body_template = {
+        "ProgramName": "", "Code": "", "ProgramNameXS": "",
+        "DateRangeSelection": "", "DateRangeFrom": "", "DateRangeTo": "",
+        "ProgramType": "", "Age": "", "Facility": "0", "Days": "0",
+        "Pagination": {"CurrentPageIndex": 1, "LoadMore": True},
+    }
+
+    with Fetcher(args.data / "raw", delay_seconds=args.delay) as fetcher:
+        for category in categories:
+            payload = {**body_template, "ProgramType": str(category)}
+            url = f"{base_url}{FILTER_PATH}"
+            try:
+                result = fetcher.post_json(url, payload, headers=XHR_HEADERS)
+            except Exception as exc:  # noqa: BLE001 - report and continue
+                print(f"\ncategory {category}: request failed — {redact(exc)}")
+                continue
+
+            rows = parse_fragment(result.text, base_url)
+            dated = [r for r in rows if r.start is not None]
+            print(f"\ncategory {category}: {len(rows)} programme link(s), {len(dated)} dated")
+
+            if rows and not dated:
+                print(
+                    "  Links found but no dates parsed — the markup has moved.\n"
+                    "  Re-run with --save and send the fixture."
+                )
+            for row in dated[: args.top]:
+                span = f"{row.start}" + (f" to {row.end}" if row.end != row.start else "")
+                ages = (
+                    f"{row.min_age}-{row.max_age}y"
+                    if row.min_age is not None
+                    else "age not stated"
+                )
+                print(f"  {span:<26} {row.title[:44]:<46} {ages}, {row.status.value}")
+
+            if args.save:
+                out = Path("tests/fixtures") / f"recdesk_category_{category}.html"
+                out.parent.mkdir(parents=True, exist_ok=True)
+                out.write_text(result.text, encoding="utf-8")
+                print(f"  saved raw fragment -> {out}")
+
+    return 0
+
+
 def cmd_tribe_discover(args: argparse.Namespace) -> int:
     """Report what is actually in a site's Events Calendar.
 
@@ -689,6 +776,28 @@ def build_parser() -> argparse.ArgumentParser:
         help="override the endpoint, to test against a fixture server",
     )
     doctor.set_defaults(func=cmd_active_doctor)
+
+    recdesk = sub.add_parser(
+        "recdesk-discover",
+        help="ask a RecDesk portal what its FilterPrograms endpoint holds",
+    )
+    _add_global_flags(recdesk, with_defaults=False)
+    recdesk.add_argument("base_url", help="portal root, e.g. https://tucker.recdesk.com")
+    recdesk.add_argument(
+        "--categories", nargs="*", default=None,
+        help="RecDesk ProgramType ids to query (default: 9, Day Camp)",
+    )
+    recdesk.add_argument(
+        "--list-categories", action="store_true",
+        help="list the portal's category ids instead of querying one",
+    )
+    recdesk.add_argument(
+        "--save", action="store_true",
+        help="write each raw fragment to tests/fixtures/ as a recorded contract",
+    )
+    recdesk.add_argument("--top", type=int, default=25, help="rows to show")
+    recdesk.add_argument("--delay", type=float, default=1.5, help="seconds between calls")
+    recdesk.set_defaults(func=cmd_recdesk_discover)
 
     tribe = sub.add_parser(
         "tribe-discover",

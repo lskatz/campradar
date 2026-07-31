@@ -76,12 +76,21 @@ sources:
   # These URLs are placeholders and deliberately disabled. Confirm each one
   # with `campradar probe` and check the site's robots.txt before enabling.
 
+  # RecDesk renders its programme table over XHR and keys the filter to the
+  # ASP.NET session, so the visible page is always empty to a stateless
+  # fetcher. The `recdesk` adapter posts to /Community/Program/FilterPrograms
+  # the way the portal's own JavaScript does. See docs/recdesk.md.
+  #
+  # Category 9 is Day Camp (Outdoor Education / Specialty / Sports /
+  # Traditional); 20 is Teen Camp. Category 3 ("Youth") is 25 sports
+  # programmes and one dance class, which is what this source used to point
+  # at and why it never produced a camp.
   - id: tucker-rec
     provider_slug: tucker-rec
-    adapter: jsonld
-    enabled: false   # RecDesk listings are server-rendered but carry no JSON-LD. See docs/sources-todo.md.
-    urls:
-      - https://tucker.recdesk.com/Community/Program?category=3
+    adapter: recdesk
+    enabled: true
+    base_url: https://tucker.recdesk.com
+    categories: ["9", "20"]
 
   - id: dekalb-county
     provider_slug: dekalb-county

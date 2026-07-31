@@ -93,14 +93,25 @@ Thanksgiving, winter or spring camps at all before writing an adapter; if they
 are summer-only they do not belong in this tool, and that is a finding rather
 than a gap.
 
-### `tucker-rec` — RecDesk
+### `tucker-rec` — RecDesk — **done, pending live verification**
 
-**Observed.** `tucker.recdesk.com/Community/Program?category=3` returns 200 with
-a 163 KB server-rendered body and no JSON-LD.
+Now handled by the `recdesk` adapter. Kept here as the record of what was
+wrong, because the diagnosis was initially wrong twice and both mistakes are
+instructive.
 
-**Why it is a good next target.** No SPA, no gateway, no key — the listings are
-in the HTML that arrives. RecDesk is also a common platform, so an adapter here
-likely generalises to other municipalities.
+**First wrong call:** "server-rendered, the listings are in the HTML." That was
+inferred from a 163 KB `Content-Length` and never checked. The served table is
+`Loading...` / `No results found`; the rows arrive over XHR.
+
+**Second wrong call, milder:** the configured URL was `category=3` ("Youth"),
+which is 25 sports programmes and one dance class. The camps are `category=9`
+(Day Camp) and `category=20` (Teen Camp).
+
+**The tell nobody would guess:** two GETs seconds apart reported 8 and then 76
+Day Camp programmes. The sidebar counts are session state, keyed to
+`ASP.NET_SessionId`. So a stateless fetch does not merely miss the rows, it
+lands in a session whose default filter resolves to nothing — which is why this
+source reported "fetched cleanly but produced 0 sessions" instead of erroring.
 
 ### `dunwoody-nature-center-camps`
 
