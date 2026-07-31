@@ -33,7 +33,7 @@ from .adapters.tribe import build_events_url, strip_html
 from .delta import load_state
 from .fetch import Fetcher
 from .icsgen import render_calendar
-from .pipeline import load_sources, run_pipeline
+from .pipeline import load_breaks, load_sources, run_pipeline
 from .redact import install_redaction, redact
 
 DEFAULT_CONFIG = Path("config")
@@ -522,6 +522,59 @@ def cmd_recdesk_discover(args: argparse.Namespace) -> int:
             dated = [r for r in rows if r.start is not None]
             print(f"\ncategory {category}: {len(rows)} programme link(s), {len(dated)} dated")
 
+            if args.pages > 1:
+                # Page-by-page, because the failure this exists to catch is
+                # silent: if the server ignores CurrentPageIndex and keeps
+                # replaying page 1, the adapter stops after two requests and
+                # you quietly get only the earliest slice of the catalogue --
+                # which, since RecDesk sorts by date, means only the past.
+                print("  pagination check:")
+                previous = {r.title for r in rows}
+                first_page = set(previous)
+                for page in range(2, args.pages + 1):
+                    payload_n = {**payload, "Pagination": {
+                        "CurrentPageIndex": page, "LoadMore": True}}
+                    try:
+                        more = fetcher.post_json(url, payload_n, headers=XHR_HEADERS)
+                    except Exception as exc:  # noqa: BLE001
+                        print(f"    page {page}: request failed — {redact(exc)}")
+                        break
+                    page_rows = parse_fragment(more.text, base_url)
+                    titles = {r.title for r in page_rows}
+                    page_dated = [r for r in page_rows if r.start is not None]
+                    span = (
+                        f"{min(r.start for r in page_dated)} .. "
+                        f"{max(r.start for r in page_dated)}"
+                        if page_dated else "no dates"
+                    )
+                    if not page_rows:
+                        print(f"    page {page}: empty — end of results")
+                        break
+                    if titles == first_page:
+                        print(
+                            f"    page {page}: IDENTICAL to page 1 ({len(titles)} rows).\n"
+                            f"      The server is ignoring CurrentPageIndex. Paging by index\n"
+                            f"      does not work here; the adapter is only ever seeing the\n"
+                            f"      first page, which is the earliest dates."
+                        )
+                        break
+                    fresh = titles - previous
+                    print(f"    page {page}: {len(page_rows)} rows, {len(fresh)} new, {span}")
+                    previous |= titles
+                    if not fresh:
+                        print("      no new titles — treating this as the end")
+                        break
+                    if args.save:
+                        out_n = Path("tests/fixtures") / f"recdesk_category_{category}_p{page}.html"
+                        out_n.write_text(more.text, encoding="utf-8")
+                        print(f"      saved -> {out_n}")
+
+            if dated:
+                print(
+                    f"  page-1 date span: {min(r.start for r in dated)} .. "
+                    f"{max(r.start for r in dated)}"
+                )
+
             if rows and not dated:
                 print(
                     "  Links found but no dates parsed — the markup has moved.\n"
@@ -632,6 +685,112 @@ def cmd_tribe_discover(args: argparse.Namespace) -> int:
         "  category_slugs: [<slug>]\n"
         "on a source of adapter: tribe, and drop `search`."
     )
+    return 0
+
+
+def cmd_list(args: argparse.Namespace) -> int:
+    """Show what is actually in state, so a source can be inspected directly.
+
+    `refresh` reports counts; counts hide the interesting failures. A source
+    that returns only the first page of results, or only past sessions, or
+    everything undated, all report a healthy-looking non-zero number. Seeing
+    the rows -- especially the date span per source -- is what makes those
+    visible.
+
+    Reads `data/state.json` rather than the network, so it is instant and can
+    be run repeatedly while debugging without touching a provider.
+    """
+    state_path = args.data / "state.json"
+    if not state_path.exists():
+        print(f"No state at {state_path}. Run `campradar refresh` first.", file=sys.stderr)
+        return 1
+
+    records = list(load_state(state_path).values())
+    if not records:
+        print("State is empty.")
+        return 0
+
+    breaks = load_breaks(args.config / "breaks.yaml")
+    by_name = {b.name: b for b in breaks}
+
+    rows = []
+    for record in records:
+        session = record.session
+        if args.source and session.source_id != args.source:
+            continue
+        if args.provider and session.provider_slug != args.provider:
+            continue
+        if args.status and session.registration_status.value != args.status:
+            continue
+        if args.since and session.end_date < args.since:
+            continue
+        if args.until and session.start_date > args.until:
+            continue
+        if args.brk:
+            window = by_name.get(args.brk)
+            if window is None:
+                print(f"Unknown break {args.brk!r}. Known: {', '.join(by_name)}", file=sys.stderr)
+                return 1
+            if session.end_date < window.start or session.start_date > window.end:
+                continue
+        rows.append(record)
+
+    if not rows:
+        print("Nothing matched those filters.")
+        return 0
+
+    rows.sort(key=lambda r: (r.session.start_date, r.session.title))
+
+    if args.group_by_source:
+        groups: dict[str, list] = {}
+        for record in rows:
+            groups.setdefault(record.session.source_id, []).append(record)
+    else:
+        groups = {"": rows}
+
+    for source_id, group in sorted(groups.items()):
+        if source_id:
+            spans = [r.session.start_date for r in group]
+            print(f"\n=== {source_id}: {len(group)} session(s), {min(spans)} .. {max(spans)}")
+        for record in group:
+            session = record.session
+            span = str(session.start_date)
+            if session.end_date != session.start_date:
+                span += f"..{session.end_date}"
+            ages = (
+                f"{session.min_age or ''}-{session.max_age or ''}y"
+                if (session.min_age or session.max_age)
+                else "-"
+            )
+            matched = [b.name for b in breaks if not (
+                session.end_date < b.start or session.start_date > b.end
+            )]
+            label = matched[0] if matched else "(no break)"
+            line = (
+                f"  {span:<23} {session.title[:44]:<46} "
+                f"{ages:<9} {session.registration_status.value:<13} {label}"
+            )
+            print(line)
+            if args.urls:
+                print(f"      {session.url}")
+
+    print(f"\n{len(rows)} session(s).")
+
+    # A source whose sessions all fall outside every configured break is
+    # usually a sign the wrong catalogue is being read, not that the provider
+    # is unhelpful -- worth saying out loud rather than leaving to be noticed.
+    unmatched = [
+        r for r in rows
+        if not any(
+            not (r.session.end_date < b.start or r.session.start_date > b.end) for b in breaks
+        )
+    ]
+    if unmatched and len(unmatched) == len(rows):
+        print(
+            "None of these fall inside a configured school break. Either the "
+            "provider\nonly lists term-time or summer programmes, or the source "
+            "is reading the\nwrong category."
+        )
     return 0
 
 
@@ -796,6 +955,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="write each raw fragment to tests/fixtures/ as a recorded contract",
     )
     recdesk.add_argument("--top", type=int, default=25, help="rows to show")
+    recdesk.add_argument(
+        "--pages", type=int, default=1, metavar="N",
+        help="walk N pages and report whether paging actually advances",
+    )
     recdesk.add_argument("--delay", type=float, default=1.5, help="seconds between calls")
     recdesk.set_defaults(func=cmd_recdesk_discover)
 
@@ -811,6 +974,24 @@ def build_parser() -> argparse.ArgumentParser:
     tribe.add_argument("--top", type=int, default=25, help="rows to show")
     tribe.add_argument("--delay", type=float, default=1.0, help="seconds between calls")
     tribe.set_defaults(func=cmd_tribe_discover)
+
+    listing = sub.add_parser("list", help="show sessions currently in state")
+    _add_global_flags(listing, with_defaults=False)
+    listing.add_argument("--source", help="only this source id")
+    listing.add_argument("--provider", help="only this provider slug")
+    listing.add_argument("--status", help="only this registration status")
+    listing.add_argument(
+        "--break", dest="brk", metavar="NAME",
+        help="only sessions overlapping this break",
+    )
+    listing.add_argument("--since", type=date.fromisoformat, metavar="YYYY-MM-DD")
+    listing.add_argument("--until", type=date.fromisoformat, metavar="YYYY-MM-DD")
+    listing.add_argument("--urls", action="store_true", help="print each session's URL")
+    listing.add_argument(
+        "--group-by-source", action="store_true",
+        help="group output by source and show each source's date span",
+    )
+    listing.set_defaults(func=cmd_list)
 
     export = sub.add_parser("export", help="write an .ics from current state")
     _add_global_flags(export, with_defaults=False)
