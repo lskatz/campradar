@@ -15,6 +15,13 @@
 #
 # `enabled: false` retires a source without deleting the knowledge of it —
 # useful when a site is mid-redesign and the adapter is temporarily broken.
+#
+# Only sources that actually produce sessions are enabled here. Everything
+# that has been tried and does not yet work lives in docs/sources-todo.md,
+# with the evidence and the next step, so that re-enabling one is a decision
+# made from notes rather than from scratch. A run that fetches eight pages to
+# produce nothing is not more thorough than one that fetches one — it is just
+# slower, noisier, and harder to read when something does break.
 
 providers:
   - slug: fernbank-science-center
@@ -72,21 +79,21 @@ sources:
   - id: tucker-rec
     provider_slug: tucker-rec
     adapter: jsonld
-    enabled: true
+    enabled: false   # RecDesk listings are server-rendered but carry no JSON-LD. See docs/sources-todo.md.
     urls:
       - https://tucker.recdesk.com/Community/Program?category=3
 
   - id: dekalb-county
     provider_slug: dekalb-county
     adapter: jsonld
-    enabled: true
+    enabled: false   # ActiveNet SPA shell — no markup in the initial response. See docs/sources-todo.md.
     urls:
       - https://anc.apm.activecommunities.com/dekalbcountyrecreation/activity/search
 
   - id: dunwoody-nature-center-camps
     provider_slug: dunwoody-nature-center
     adapter: jsonld
-    enabled: true
+    enabled: false   # Prose only; no structured markup yet. See docs/sources-todo.md.
     urls:
       # /camps/ returned 404. School-break camps live here; summer is at
       # /education/summer-camp/. Still prose only — no markup to parse yet.
@@ -95,7 +102,7 @@ sources:
   - id: callanwolde-camps
     provider_slug: callanwolde
     adapter: jsonld
-    enabled: true
+    enabled: false   # Summer-only page; camps live on campscui.active.com. See docs/sources-todo.md.
     urls:
       # /camps/ 301s to here. Kept only as a JSON-LD canary: if Callanwolde
       # ever adds markup we want to know, but callanwolde-tribe below is
@@ -105,7 +112,7 @@ sources:
   - id: zoo-atlanta-camps
     provider_slug: zoo-atlanta
     adapter: jsonld
-    enabled: true
+    enabled: false   # Programme pages are prose; no JSON-LD. See docs/sources-todo.md.
     urls:
       # /programs/camps/ returned 404 — the path is /program/ (singular).
       - https://zooatlanta.org/program/fall-camp/

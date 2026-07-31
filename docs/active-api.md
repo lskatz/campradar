@@ -170,13 +170,26 @@ Sources: 1 produced camps, 2 returned nothing, 1 failed
 
 `sources_empty` is in `sessions.json` and on the dashboard too.
 
+## Three ACTIVE products, one brand
+
+Before debugging anything, be clear which system a provider is actually on.
+These do not reach each other:
+
+| System | Host | Used by |
+|---|---|---|
+| Activity Search API v2 | `api.amp.active.com` | what `$ACTIVE_API_KEY` is for |
+| ActiveNet | `anc.apm.activecommunities.com` | DeKalb County Recreation |
+| Camp & Class Manager | `campscui.active.com` | Callanwolde |
+
+A working Search API key tells you nothing about the other two.
+
 ## Status
 
 The adapter is tested against fixtures built from Active's documented sample
 response, driven through `httpx.MockTransport` — pagination, deduplication,
 JSON errors, and field mapping all covered offline in `tests/test_active.py`.
 
-It has **not** been run against the live API. The response shape beyond the
+It has **not** been run successfully against the live API. The response shape beyond the
 documented sample is unverified, which is why unknown values are logged rather
 than assumed. Expect at least one field to need adjusting on first contact.
 
@@ -190,9 +203,20 @@ X-Error-Detail-Header: Account Inactive
 ```
 
 This is **not** a wrong key and not a config problem. The key transmitted fine;
-ACTIVE's gateway (Mashery) is refusing at the *developer account* level. Usual
-causes are an unverified registration email or an application still awaiting
-approval. Fix it at `developer.active.com`, not in this repo.
+ACTIVE's gateway (Mashery) is refusing at the *developer account* level.
+
+**An approved, active account can still get this.** That was measured, not
+assumed: on 2026-07-31, with an account confirmed active and a valid key,
+ACTIVE's own published sample query returned this code over both https and
+http. ACTIVE's support forum carries unresolved reports of the same going back
+nine years, including from accounts ACTIVE staff confirmed as valid. So
+"activate your account" — which this document previously advised — is not
+reliable guidance.
+
+Run `campradar active-doctor` first. It repeats ACTIVE's documented sample
+query beside ours, which separates "our params are wrong" (fixable here) from
+"this key cannot read this API" (not fixable here). If the documented sample
+fails, the next step is an ACTIVE support ticket quoting the Mashery code.
 
 The adapter reads those headers and says so explicitly, because "check your key"
 sends you to the wrong place entirely.

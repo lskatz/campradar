@@ -351,13 +351,24 @@ class ActiveSearchAdapter(Adapter):
                 mashery = exc.response.headers.get("X-Mashery-Error-Code", "")
                 detail = exc.response.headers.get("X-Error-Detail-Header", "")
                 if "DEVELOPER_INACTIVE" in mashery.upper() or "inactive" in detail.lower():
+                    # Deliberately does NOT tell you to go activate the account.
+                    # That was this message's original advice, and it is wrong
+                    # often enough to be harmful: an approved, active account
+                    # with a valid key gets this same code, and ACTIVE's forum
+                    # has unresolved reports of it going back years. Sending
+                    # someone to a settings page that already says "active"
+                    # wastes the one thing an error message is for.
                     raise AdapterError(
-                        f"{self.source_id}: the key was accepted but the ACTIVE "
-                        f"developer account is not active ({mashery or detail}). "
-                        f"This is not a config problem — activate the account at "
-                        f"developer.active.com (check for an unverified email or an "
-                        f"application still awaiting approval), then re-enable this "
-                        f"source."
+                        f"{self.source_id}: ACTIVE's gateway refused at the "
+                        f"developer-account level ({mashery or detail}). The key "
+                        f"transmitted fine, so this is not a config problem here. "
+                        f"Note that an account showing as active can still return "
+                        f"this. Run `campradar active-doctor`: it repeats ACTIVE's "
+                        f"own documented sample query with your key, which "
+                        f"distinguishes a broken query from a key that cannot read "
+                        f"this API at all. If the sample fails too, the next step "
+                        f"is an ACTIVE support ticket quoting the Mashery code, "
+                        f"not a change to sources.yaml."
                     ) from exc
                 raise AdapterError(
                     f"{self.source_id}: ACTIVE rejected the request (HTTP {code}"

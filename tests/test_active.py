@@ -487,11 +487,18 @@ class TestAuthFailuresAreLegible:
         assert str(status) in message
 
     def test_an_inactive_account_is_reported_as_such_not_as_a_bad_key(self, tmp_path):
-        """Observed in the wild: the key works, the account is not activated.
+        """Observed in the wild: the key works and the account is approved.
 
-        Telling someone to check their key here sends them to edit config, when
-        the fix is on ACTIVE's developer portal. Different problem, different
-        place, so the message has to distinguish them.
+        This test used to assert the message pointed at developer.active.com.
+        That advice turned out to be wrong: measured on 2026-07-31 against an
+        account confirmed active with a valid key, ACTIVE's own documented
+        sample query returned this code anyway. Sending someone to a settings
+        page that already reads "active" is worse than saying nothing, because
+        it looks like an answer.
+
+        So the contract is now: name the layer that refused, say it is not a
+        config problem here, and hand over a command that can actually tell the
+        two cases apart.
         """
         message = self.run_with_status(
             403,
@@ -501,8 +508,25 @@ class TestAuthFailuresAreLegible:
                 "X-Error-Detail-Header": "Account Inactive",
             },
         )
-        assert "developer.active.com" in message
         assert "not a config problem" in message
+        assert "active-doctor" in message, "must hand over a next action"
+        assert "support" in message, "must name the escalation path"
+        assert "ERR_403_DEVELOPER_INACTIVE" in message, "must quote the code"
+
+    def test_the_inactive_message_does_not_send_you_to_activate_the_account(self, tmp_path):
+        """Guards against the old advice creeping back in.
+
+        An active account can still get this code, so 'go activate it' is a
+        dead end. This is the kind of regression that is invisible in review --
+        the message still reads plausibly -- which is why it gets a test.
+        """
+        message = self.run_with_status(
+            403,
+            tmp_path,
+            headers={"X-Mashery-Error-Code": "ERR_403_DEVELOPER_INACTIVE"},
+        )
+        assert "developer.active.com" not in message
+        assert "awaiting approval" not in message
 
     def test_the_inactive_message_still_hides_the_key(self, tmp_path):
         message = self.run_with_status(
