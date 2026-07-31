@@ -615,6 +615,23 @@ def cmd_recdesk_discover(args: argparse.Namespace) -> int:
                         out_n.write_text(more.text, encoding="utf-8")
                         print(f"      saved -> {out_n}")
 
+            # Mis-scoped parsing has a fingerprint: many rows sharing one date
+            # span, or repeated titles. Both mean the record boundary is wrong,
+            # and both look like perfectly good output unless flagged.
+            if dated:
+                spans = {(r.start, r.end) for r in dated}
+                titles = [r.title for r in dated]
+                if len(dated) >= 5 and len(spans) <= max(2, len(dated) // 5):
+                    print(
+                        f"  WARNING: {len(dated)} rows share only {len(spans)} distinct date\n"
+                        f"    span(s). That usually means the parser is reading a neighbouring\n"
+                        f"    row's dates, or a registration window rather than the programme\n"
+                        f"    dates. Re-run with --save and check the fixture."
+                    )
+                if len(set(titles)) < len(titles):
+                    dupes = len(titles) - len(set(titles))
+                    print(f"  WARNING: {dupes} duplicate title(s) — record boundaries look wrong.")
+
             if dated:
                 print(
                     f"  page-1 date span: {min(r.start for r in dated)} .. "

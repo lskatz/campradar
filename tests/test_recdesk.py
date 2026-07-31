@@ -347,3 +347,34 @@ class TestBodyMatchesTheCapturedBrowserRequest:
         body = self.body({"page_size": 50})
         assert body["ResultsPerPage"] == "50"
         assert body["Pagination"]["PageSize"] == "50"
+
+
+class TestActionLinksAreNotProgrammes:
+    """RecDesk renders a "Register Now" link inside every row.
+
+    Observed live: a sweep of category 0 reported 39 "programmes", ten of which
+    were the words "Register Now" paired with whatever dates sat nearest. The
+    reconstructed fixture had no such buttons, so the suite passed on markup
+    that does not exist -- which is the standing hazard of a fixture nobody
+    captured.
+    """
+
+    @pytest.mark.parametrize(
+        "label", ["Register Now", "register now", "Add to Cart", "More Info", "Waitlist"]
+    )
+    def test_control_links_are_skipped(self, label):
+        html = (
+            f'<div><a href="/Community/Program/Detail/1">{label}</a>'
+            f"<span>Dates 8/24/2026 - 10/14/2026</span></div>"
+        )
+        assert parse_fragment(html) == []
+
+    def test_a_real_programme_beside_a_button_still_parses(self):
+        html = (
+            '<div class="program-row">'
+            '<a href="/Community/Program/Detail/7">Fall Break Art Studio</a>'
+            '<a href="/Community/Program/Detail/7">Register Now</a>'
+            "<span>Dates 10/5/2026 - 10/9/2026</span></div>"
+        )
+        rows = parse_fragment(html)
+        assert [r.title for r in rows] == ["Fall Break Art Studio"]

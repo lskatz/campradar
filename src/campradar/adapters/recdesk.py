@@ -103,6 +103,16 @@ DEFAULT_PAGE_SIZE = 25
 #: request with the date filter set.
 DATE_RANGE_PICK = "pick"
 
+#: Anchor text that is a control, not a programme. RecDesk renders a
+#: "Register Now" button as a link inside each row, so a naive anchor sweep
+#: invents a programme per button -- and then pairs it with whatever dates sit
+#: nearest, which is how a registration window ends up looking like a camp.
+ACTION_TEXT = frozenset({
+    "register now", "register", "add to cart", "more info", "details",
+    "view details", "waitlist", "join waitlist", "log in", "login",
+    "sign up", "sold out", "full", "read more", "select",
+})
+
 _DATE_RANGE = re.compile(r"(\d{1,2}/\d{1,2}/\d{4})\s*[-–]\s*(\d{1,2}/\d{1,2}/\d{4})")
 _SINGLE_DATE = re.compile(r"(\d{1,2}/\d{1,2}/\d{4})")
 #: "5y - 12y", "7y - 12y 0m", "5y 6m - 12y"
@@ -274,6 +284,8 @@ def parse_fragment(html: str, base_url: str = "") -> list[ProgramRow]:
         if "?category=" in href or "type=" in href or href.startswith("#"):
             continue
         if "/Program" not in href and "/Activity" not in href:
+            continue
+        if title.strip().lower() in ACTION_TEXT:
             continue
 
         text = _record_text(anchor)
