@@ -475,7 +475,7 @@ def cmd_recdesk_discover(args: argparse.Namespace) -> int:
     day RecDesk restyles, the diff shows exactly what moved instead of the
     suite going mysteriously red.
     """
-    from .adapters.recdesk import FILTER_PATH, XHR_HEADERS, parse_fragment
+    from .adapters.recdesk import FILTER_PATH, parse_fragment, xhr_headers
 
     base_url = args.base_url.rstrip("/")
 
@@ -510,6 +510,15 @@ def cmd_recdesk_discover(args: argparse.Namespace) -> int:
 
     with Fetcher(args.data / "raw", delay_seconds=args.delay) as fetcher:
         for category in categories:
+            referer = f"{base_url}/Community/Program?category={category}"
+            if not args.no_prime:
+                # Same reasoning as the adapter: give the POST a session to
+                # land in, exactly as the browser does.
+                try:
+                    fetcher.get(referer)
+                except Exception as exc:  # noqa: BLE001
+                    print(f"  (could not prime session: {redact(exc)})")
+
             payload = {**body_template, "ProgramType": str(category)}
             if args.date_range_selection is not None:
                 payload["DateRangeSelection"] = args.date_range_selection
@@ -522,7 +531,7 @@ def cmd_recdesk_discover(args: argparse.Namespace) -> int:
                 payload[key] = value
             url = f"{base_url}{FILTER_PATH}"
             try:
-                result = fetcher.post_json(url, payload, headers=XHR_HEADERS)
+                result = fetcher.post_json(url, payload, headers=xhr_headers(referer))
             except Exception as exc:  # noqa: BLE001 - report and continue
                 print(f"\ncategory {category}: request failed — {redact(exc)}")
                 continue
@@ -544,7 +553,7 @@ def cmd_recdesk_discover(args: argparse.Namespace) -> int:
                     payload_n = {**payload, "Pagination": {
                         "CurrentPageIndex": page, "LoadMore": True}}
                     try:
-                        more = fetcher.post_json(url, payload_n, headers=XHR_HEADERS)
+                        more = fetcher.post_json(url, payload_n, headers=xhr_headers(referer))
                     except Exception as exc:  # noqa: BLE001
                         print(f"    page {page}: request failed — {redact(exc)}")
                         break
@@ -979,6 +988,10 @@ def build_parser() -> argparse.ArgumentParser:
     recdesk.add_argument(
         "--date-range-selection", default=None, metavar="VALUE",
         help="value for DateRangeSelection; empty string is RecDesk's default (This Week)",
+    )
+    recdesk.add_argument(
+        "--no-prime", action="store_true",
+        help="skip the session-priming GET, to test whether it matters",
     )
     recdesk.add_argument("--date-from", default=None, metavar="MM/DD/YYYY")
     recdesk.add_argument("--date-to", default=None, metavar="MM/DD/YYYY")

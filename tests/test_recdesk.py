@@ -46,6 +46,11 @@ def run_adapter(pages, tmp_path, config=None):
     calls = []
 
     def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "GET":
+            # The session-priming request. Recorded, but it does not consume a
+            # canned fragment -- those stand in for FilterPrograms responses.
+            calls.append(request)
+            return httpx.Response(200, text="<html><body>programme page</body></html>")
         calls.append(request)
         body = responses.pop(0) if responses else ""
         return httpx.Response(200, text=body)
@@ -146,7 +151,7 @@ class TestFragmentParsing:
 class TestAdapter:
     def test_it_posts_to_filterprograms_as_the_browser_does(self, tmp_path):
         _, calls = run_adapter([FIXTURE, ""], tmp_path)
-        request = calls[0]
+        request = next(c for c in calls if c.method == "POST")
         assert request.method == "POST"
         assert request.url.path == "/Community/Program/FilterPrograms"
         assert request.headers["X-Requested-With"] == "XMLHttpRequest"
@@ -160,7 +165,7 @@ class TestAdapter:
         import json
 
         _, calls = run_adapter([FIXTURE, ""], tmp_path)
-        body = json.loads(calls[0].content)
+        body = json.loads(next(c for c in calls if c.method == "POST").content)
         for key in (
             "ProgramName", "Code", "ProgramNameXS", "DateRangeSelection",
             "DateRangeFrom", "DateRangeTo", "ProgramType", "Age",
@@ -182,13 +187,15 @@ class TestAdapter:
         import json
 
         _, calls = run_adapter([FIXTURE, FIXTURE, ""], tmp_path)
-        pages = [json.loads(c.content)["Pagination"]["CurrentPageIndex"] for c in calls]
+        posts = [c for c in calls if c.method == "POST"]
+        pages = [json.loads(c.content)["Pagination"]["CurrentPageIndex"] for c in posts]
         assert pages[:2] == [1, 2]
 
     def test_a_repeated_page_ends_the_loop(self, tmp_path):
         """RecDesk keeps answering past the last page; identical rows mean stop."""
         sessions, calls = run_adapter([FIXTURE, FIXTURE, FIXTURE], tmp_path)
-        assert len(calls) == 2, "should stop once a page adds nothing new"
+        posts = [c for c in calls if c.method == "POST"]
+        assert len(posts) == 2, "should stop once a page adds nothing new"
         assert len(sessions) == 5, "five programmes, each yielded once"
 
     def test_multiple_categories_are_each_queried(self, tmp_path):
@@ -197,7 +204,9 @@ class TestAdapter:
         _, calls = run_adapter(
             [FIXTURE, "", FIXTURE, ""], tmp_path, config={"categories": ["9", "20"]}
         )
-        types = {json.loads(c.content)["ProgramType"] for c in calls}
+        types = {
+            json.loads(c.content)["ProgramType"] for c in calls if c.method == "POST"
+        }
         assert types == {"9", "20"}
 
 
@@ -232,3 +241,41 @@ class TestFailingLoudly:
     def test_missing_base_url_is_a_source_level_failure(self, tmp_path):
         with pytest.raises(AdapterError):
             run_adapter([FIXTURE], tmp_path, config={"base_url": ""})
+
+
+class TestSessionPriming:
+    """The POST must land in an established session, as it does in a browser.
+
+    Every date-filter value tried against the live site returned the same
+    current-week rows, which is the signature of a server applying session
+    defaults rather than the submitted filter. The browser never issues this
+    POST cold -- it always has the programme page open first -- so neither
+    should we.
+    """
+
+    def test_the_programme_page_is_fetched_before_filtering(self, tmp_path):
+        _, calls = run_adapter([FIXTURE, ""], tmp_path)
+        assert calls[0].method == "GET", "priming GET must come first"
+        assert "category=9" in str(calls[0].url)
+
+    def test_the_post_carries_a_referer(self, tmp_path):
+        _, calls = run_adapter([FIXTURE, ""], tmp_path)
+        post = next(c for c in calls if c.method == "POST")
+        assert post.headers.get("Referer", "").endswith("category=9")
+
+    def test_priming_can_be_disabled(self, tmp_path):
+        """Kept switchable so the hypothesis stays falsifiable."""
+        _, calls = run_adapter([FIXTURE, ""], tmp_path, config={"prime_session": False})
+        assert all(c.method == "POST" for c in calls)
+
+    def test_a_failed_priming_request_does_not_abort_the_source(self, tmp_path):
+        """Best effort: if the page 404s, still try the filter."""
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.method == "GET":
+                return httpx.Response(500)
+            return httpx.Response(200, text=FIXTURE)
+
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+        adapter = RecDeskAdapter(CONFIG)
+        with Fetcher(tmp_path / "raw", delay_seconds=0.0, client=client) as fetcher:
+            assert adapter.run(fetcher), "should still have parsed the fragment"

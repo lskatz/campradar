@@ -71,6 +71,20 @@ XHR_HEADERS = {
     "Accept": "text/html, */*; q=0.01",
 }
 
+
+def xhr_headers(referer: str | None = None) -> dict[str, str]:
+    """XHR headers, optionally with the Referer the browser sends.
+
+    The captured request carries
+    `Referer: .../Community/Program?category=9`. ASP.NET applications
+    frequently reconstruct filter context from the referring page, so omitting
+    it is not obviously harmless even though the field is nominally advisory.
+    """
+    headers = dict(XHR_HEADERS)
+    if referer:
+        headers["Referer"] = referer
+    return headers
+
 MAX_PAGES = 25
 
 _DATE_RANGE = re.compile(r"(\d{1,2}/\d{1,2}/\d{4})\s*[-–]\s*(\d{1,2}/\d{1,2}/\d{4})")
@@ -312,9 +326,26 @@ class RecDeskAdapter(Adapter):
         dated = 0
 
         for category in categories:
+            # Prime the session before filtering. RecDesk keeps filter state
+            # against ASP.NET_SessionId, and a POST arriving as the very first
+            # request of a session lands in one whose defaults have already been
+            # decided. The browser never does this -- it always has the
+            # programme page open first -- and the observed symptom (every
+            # filter value returning the same current-week rows) is what a
+            # server ignoring your filter in favour of session defaults looks
+            # like. Cookies persist on the shared client, so this GET is what
+            # makes the POST that follows a continuation rather than a cold
+            # start.
+            referer = f"{base_url}/Community/Program?category={category}"
+            if self.config.get("prime_session", True):
+                try:
+                    fetcher.get(referer)
+                except Exception as exc:  # noqa: BLE001 - priming is best effort
+                    log.debug("%s: could not prime session (%s)", self.source_id, exc)
+
             for page in range(1, max_pages + 1):
                 result = fetcher.post_json(
-                    url, self._body(str(category), page), headers=XHR_HEADERS
+                    url, self._body(str(category), page), headers=xhr_headers(referer)
                 )
                 rows = parse_fragment(result.text, base_url)
                 if not rows:
