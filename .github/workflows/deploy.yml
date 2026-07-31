@@ -35,6 +35,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Reports style separately from publishing, and on purpose does not gate the
+  # deploy job. Camp registrations sell out; blocking a data refresh from going
+  # live because a line ran to 101 characters would be the tail wagging the dog.
+  # Lint going red is a message to the maintainer, not a reason to withhold
+  # information from people trying to find childcare.
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - run: ruff check src tests
+
   build:
     runs-on: ubuntu-latest
     steps:
