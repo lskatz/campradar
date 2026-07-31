@@ -207,3 +207,56 @@ class TestEmptySourcesAreDistinctFromWorkingOnes:
     def test_no_empty_sources_means_everything_produced(self):
         result = RunResult(succeeded_sources=["a", "b"])
         assert result.productive_sources == ["a", "b"]
+
+
+class TestBreakCalendarMatchesTheDistrict:
+    """Guards config/breaks.yaml against the 2026-2027 DeKalb calendar.
+
+    These dates were wrong once in a way no code could catch: Fall Break was
+    listed for late September when the district has it in early October. The
+    file parsed, the site rendered, and the answer was two weeks off. The only
+    defence against that class of error is asserting the boundaries against the
+    published calendar, so the checks below encode school days -- the dates a
+    break must NOT contain -- rather than restating the breaks themselves.
+    """
+
+    @staticmethod
+    def _breaks():
+        from pathlib import Path
+
+        from campradar.pipeline import load_breaks
+
+        return load_breaks(Path("config/breaks.yaml"))
+
+    @pytest.mark.parametrize(
+        "day,why",
+        [
+            (date(2026, 8, 3), "First Day of School"),
+            (date(2026, 12, 18), "Last Day of Semester"),
+            (date(2027, 1, 5), "First Day of 2nd Semester"),
+            (date(2027, 5, 27), "Last Day of School"),
+            (date(2026, 10, 13), "back in class after Fall Break"),
+            (date(2026, 9, 21), "an ordinary Monday, the old wrong Fall Break"),
+        ],
+    )
+    def test_school_days_are_not_inside_any_break(self, day, why):
+        inside = [b.name for b in self._breaks() if b.contains(day)]
+        assert not inside, f"{day} is a school day ({why}) but sits inside {inside}"
+
+    @pytest.mark.parametrize(
+        "day,expected",
+        [
+            (date(2026, 10, 5), "Fall Break"),
+            (date(2026, 10, 9), "Fall Break"),
+            (date(2026, 11, 27), "Thanksgiving Break"),
+            (date(2027, 1, 4), "Winter Break"),
+            (date(2027, 4, 9), "Spring Break"),
+        ],
+    )
+    def test_break_edges_are_covered(self, day, expected):
+        """The first and last days out are the ones an off-by-one loses."""
+        assert expected in [b.name for b in self._breaks() if b.contains(day)]
+
+    def test_every_window_is_ordered(self):
+        for brk in self._breaks():
+            assert brk.start <= brk.end, f"{brk.name} ends before it starts"

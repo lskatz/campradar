@@ -1,42 +1,79 @@
-# DeKalb County School District break windows.
+# DeKalb County School District break windows, 2026-2027.
 #
-# Maintained by hand, on purpose. The district publishes its calendar at
+# Verified 2026-07-31 against the district calendar approved by the Board of
+# Education on 2025-11-10. Source:
 #   https://www.dekalbschoolsga.org/official-school-calendars
-# as a flat image with no PDF, no alt text and no machine-readable feed, so
-# OCR would be fragile in exchange for saving about five minutes of typing a
-# year. Automating this would be the wrong place to spend engineering effort.
+#
+# Maintained by hand, on purpose. The district publishes the calendar as a flat
+# image with no PDF, no alt text and no machine-readable feed, so OCR would be
+# fragile in exchange for saving about five minutes of typing a year.
+# Automating this would be the wrong place to spend engineering effort.
+#
+# `end` is INCLUSIVE and means the last day students are out. Watch the edges:
+# the last day of school and the first day of a semester are school days, so a
+# break ends the day before. Getting that wrong shows a camp as covering a day
+# the kids are actually in class.
 #
 # Check the individual school calendar too — schools occasionally add days the
 # district calendar doesn't show.
-#
-# VERIFY THESE DATES against the official calendar before relying on them.
-# The entries below are illustrative placeholders for the 2026-2027 year.
 
 breaks:
-  - name: Fall Break
-    start: 2026-09-21
-    end: 2026-09-25
+  - name: Labor Day
+    start: 2026-09-07
+    end: 2026-09-07
 
+  # Oct 5 is a Teachers' Virtual Workday (students do not report), so the
+  # week off starts a day before the district's "Fall Break" label suggests.
+  - name: Fall Break
+    start: 2026-10-05
+    end: 2026-10-09
+
+  - name: Indigenous Peoples' Day / Columbus Day
+    start: 2026-10-12
+    end: 2026-10-12
+
+  - name: Independent Learner Day
+    start: 2026-11-03
+    end: 2026-11-03
+
+  # Nov 23 and 24 are designated Inclement Weather Days 1 and 2. If the
+  # district uses a snow day earlier in the year, students return on these
+  # dates and this break effectively starts on the 25th.
   - name: Thanksgiving Break
     start: 2026-11-23
     end: 2026-11-27
 
+  # Dec 18 is the last day of the semester and Jan 5 is the first day of the
+  # second, so the window is the 21st through the 4th. Jan 4 is a
+  # Post/Pre-Planning Day: staff report, students do not.
   - name: Winter Break
     start: 2026-12-21
-    end: 2027-01-05
+    end: 2027-01-04
 
-  - name: Winter Holiday (MLK)
+  - name: Dr. Martin Luther King, Jr. Day
     start: 2027-01-18
     end: 2027-01-18
 
-  - name: Mid-Winter Break
+  # Presidents' Day (15th) runs straight into February Break (16th-19th),
+  # so parents experience it as one continuous week.
+  - name: February Break
     start: 2027-02-15
     end: 2027-02-19
 
+  - name: Professional Development Day
+    start: 2027-03-15
+    end: 2027-03-15
+
+  # Apr 5 and 6 are designated Inclement Weather Days 1 and 2 — same caveat
+  # as Thanksgiving.
   - name: Spring Break
     start: 2027-04-05
     end: 2027-04-09
 
+  # May 27 is the last day of school, so summer starts on the 28th (Post
+  # Planning Day). The end date is a GUESS: the 2027-2028 calendar is not
+  # published yet, and 2027-08-03 simply mirrors this year's start. Revisit
+  # once the district approves it.
   - name: Summer
-    start: 2027-05-27
+    start: 2027-05-28
     end: 2027-08-03
