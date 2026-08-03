@@ -1,62 +1,60 @@
-"""Shared pytest configuration.
+"""Shared fixtures. Nothing here touches the network or the real clock."""
 
-Adds `src/` to the path so tests run against the package without requiring an
-editable install first — useful in CI and for a fresh clone.
-"""
+from __future__ import annotations
 
-import socket
-import sys
+import json
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from campradar.models import CampSession, RegistrationStatus
+from campradar.store import NeededRange
+
+FIXTURES = Path(__file__).parent / "fixtures"
+
+#: A pinned clock. Every test that needs "now" uses this, so no assertion in
+#: the suite can depend on when it was run.
+RUN_ONE = datetime(2026, 9, 1, 12, 0, tzinfo=UTC)
+RUN_TWO = datetime(2026, 9, 8, 12, 0, tzinfo=UTC)
 
 
-class NetworkAccessAttempted(RuntimeError):
-    """A test tried to open a real socket."""
+@pytest.fixture
+def control_html() -> str:
+    return (FIXTURES / "example_camps.html").read_text(encoding="utf-8")
 
 
-@pytest.fixture(autouse=True)
-def _no_network(request, monkeypatch):
-    """Fail any test that reaches the network, rather than letting it pass slowly.
-
-    The suite is already offline — every adapter test drives `httpx` through a
-    `MockTransport` against a recorded fixture. The problem with that being true
-    only by convention is that it degrades quietly: one `httpx.get` added to a
-    test during debugging, and the suite starts depending on a third party's
-    HTML staying put. It then fails on a plane, in CI behind a proxy, or on the
-    morning a provider redesigns their site — and it fails for reasons that have
-    nothing to do with the change being tested. That is exactly the coupling
-    worth designing out, because a test suite you cannot trust offline is one
-    you stop running before you push.
-
-    Making the invariant enforced rather than assumed also means the fixtures
-    become the contract. When ACTIVE's real response disagrees with
-    `tests/fixtures`, the fix is to re-record the fixture — a reviewable diff
-    showing exactly what upstream changed — instead of a test that mysteriously
-    turns red.
-
-    Marked `@pytest.mark.allow_network` opts a test out, should a deliberate
-    live contract test ever be wanted. Nothing uses it today.
-    """
-    if request.node.get_closest_marker("allow_network"):
-        return
-
-    def deny(*args, **kwargs):
-        raise NetworkAccessAttempted(
-            "This test tried to open a real network connection. Tests must run "
-            "offline: drive httpx through httpx.MockTransport against a fixture "
-            "in tests/fixtures/. If a live call is genuinely intended, mark the "
-            "test @pytest.mark.allow_network."
-        )
-
-    monkeypatch.setattr(socket.socket, "connect", deny)
-    monkeypatch.setattr(socket.socket, "connect_ex", deny)
-    monkeypatch.setattr(socket, "create_connection", deny)
+@pytest.fixture
+def control_expected() -> dict:
+    return json.loads((FIXTURES / "example_camps.expected.json").read_text(encoding="utf-8"))
 
 
-def pytest_configure(config):
-    config.addinivalue_line(
-        "markers", "allow_network: permit this test to make real network calls"
+@pytest.fixture
+def ranges() -> list[NeededRange]:
+    """The needed ranges the control fixture is written against."""
+    return [
+        NeededRange("fall-break", "Fall Break", date(2026, 10, 5), date(2026, 10, 9)),
+        NeededRange("winter-break", "Winter Break", date(2026, 12, 21), date(2027, 1, 4)),
+        NeededRange("february-break", "February Break", date(2027, 2, 15), date(2027, 2, 19)),
+    ]
+
+
+def make_session(
+    title: str = "Test Camp",
+    *,
+    provider: str = "test-provider",
+    start: date = date(2026, 10, 5),
+    end: date | None = None,
+    status: RegistrationStatus = RegistrationStatus.UNKNOWN,
+    **kwargs,
+) -> CampSession:
+    """Terse session builder, so tests state only what they care about."""
+    return CampSession(
+        provider_slug=provider,
+        title=title,
+        start_date=start,
+        end_date=end or start,
+        registration_status=status,
+        source_id="test-source",
+        **kwargs,
     )

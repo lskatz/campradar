@@ -1,9 +1,4 @@
-"""Smoke tests for the data model.
-
-Not comprehensive by design — these cover the invariants that, if broken,
-would silently corrupt everything downstream: identity stability, date
-validation, and the permissive-age rule.
-"""
+"""Model boundaries: the identity rules and the validators."""
 
 from __future__ import annotations
 
@@ -12,82 +7,68 @@ from datetime import date
 import pytest
 from pydantic import ValidationError
 
-from campradar.models import CampSession, RegistrationStatus, slugify
+from campradar.models import slugify, title_fingerprint
+from conftest import make_session
 
 
-def make_session(**overrides) -> CampSession:
-    """Build a valid session, overriding whichever fields a test cares about."""
-    defaults = dict(
-        provider_slug="fernbank-science-center",
-        title="Junior Naturalists",
-        start_date=date(2027, 4, 5),
-        end_date=date(2027, 4, 9),
-        min_age=6,
-        max_age=10,
-        source_id="test",
-    )
-    return CampSession(**{**defaults, **overrides})
+def test_key_survives_marketing_rewrites():
+    """The same week retitled between seasons must keep its identity."""
+    a = make_session("Camp Kingfisher Summer Camp 2027")
+    b = make_session("Kingfisher Camp 2027")
+    assert a.key == b.key
 
 
-class TestIdentity:
-    def test_key_is_stable_across_identical_sessions(self):
-        assert make_session().key == make_session().key
-
-    def test_key_ignores_price_and_status_changes(self):
-        """A price tweak must not look like a brand-new camp."""
-        cheap = make_session(price_usd=200.0)
-        dear = make_session(price_usd=250.0, registration_status=RegistrationStatus.FULL)
-        assert cheap.key == dear.key
-
-    def test_key_survives_marketing_noise_in_title(self):
-        """'Junior Naturalists' and 'Junior Naturalists Summer Camp' are one camp."""
-        plain = make_session(title="Junior Naturalists")
-        padded = make_session(title="Junior Naturalists Summer Camp")
-        assert plain.key == padded.key
-
-    def test_key_differs_for_different_start_dates(self):
-        week_one = make_session(start_date=date(2027, 4, 5), end_date=date(2027, 4, 9))
-        week_two = make_session(start_date=date(2027, 4, 12), end_date=date(2027, 4, 16))
-        assert week_one.key != week_two.key
+def test_key_distinguishes_different_dates():
+    a = make_session("Discovery", start=date(2026, 10, 5))
+    b = make_session("Discovery", start=date(2027, 2, 15))
+    assert a.key != b.key
 
 
-class TestValidation:
-    def test_rejects_backwards_date_range(self):
-        with pytest.raises(ValidationError):
-            make_session(start_date=date(2027, 4, 9), end_date=date(2027, 4, 5))
+def test_key_ignores_price_and_status():
+    """A price tweak is not a new camp."""
+    from campradar.models import RegistrationStatus
 
-    def test_rejects_backwards_age_range(self):
-        with pytest.raises(ValidationError):
-            make_session(min_age=12, max_age=6)
-
-
-class TestEligibility:
-    def test_age_inside_range_is_eligible(self):
-        assert make_session().suits_age(8) is True
-
-    def test_age_outside_range_is_not(self):
-        assert make_session().suits_age(14) is False
-
-    def test_unstated_ages_are_permissive(self):
-        """Recall beats precision: never hide a camp because ages weren't stated."""
-        session = make_session(min_age=None, max_age=None)
-        assert session.suits_age(4) is True
-        assert session.suits_age(17) is True
+    a = make_session("Discovery", price_usd=100)
+    b = make_session("Discovery", price_usd=350, status=RegistrationStatus.FULL)
+    assert a.key == b.key
 
 
-class TestCoverage:
-    def test_duration_counts_inclusively(self):
-        assert make_session().duration_days == 5
-
-    def test_single_day_camp_is_one_day(self):
-        single = make_session(start_date=date(2027, 4, 5), end_date=date(2027, 4, 5))
-        assert single.duration_days == 1
-
-    def test_covers_last_day(self):
-        """Off-by-one here would leave a family without childcare on a Friday."""
-        assert make_session().covers(date(2027, 4, 9)) is True
-        assert make_session().covers(date(2027, 4, 10)) is False
+def test_key_preserves_word_order():
+    """Robotics for Girls and Girls for Robotics may be different programmes."""
+    assert make_session("Robotics for Girls").key != make_session("Girls for Robotics").key
 
 
-def test_slugify_handles_accents_and_punctuation():
-    assert slugify("Café  Möller & Sons!") == "cafe-moller-sons"
+def test_fingerprint_of_pure_noise_still_produces_something():
+    assert title_fingerprint("Summer Camp") == "summer-camp"
+
+
+def test_slugify_strips_accents_and_punctuation():
+    assert slugify("Café Créatif — Ages 5+") == "cafe-creatif-ages-5"
+
+
+def test_one_day_camp_lasts_one_day():
+    assert make_session("Teacher Workday", start=date(2026, 11, 3)).duration_days == 1
+
+
+def test_covers_is_inclusive():
+    session = make_session("Week", start=date(2026, 10, 5), end=date(2026, 10, 9))
+    assert session.covers(date(2026, 10, 5))
+    assert session.covers(date(2026, 10, 9))
+    assert not session.covers(date(2026, 10, 10))
+
+
+def test_backwards_dates_are_rejected():
+    with pytest.raises(ValidationError, match="precedes"):
+        make_session("Impossible", start=date(2026, 10, 9), end=date(2026, 10, 5))
+
+
+def test_inverted_age_range_is_rejected():
+    with pytest.raises(ValidationError, match="below min_age"):
+        make_session("Impossible", min_age=12, max_age=6)
+
+
+def test_unstated_ages_are_allowed():
+    """Not stated is the common case and must not be an error."""
+    session = make_session("Vague")
+    assert session.min_age is None
+    assert session.max_age is None

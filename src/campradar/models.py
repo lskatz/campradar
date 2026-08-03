@@ -1,20 +1,18 @@
 """Data model for Camp Radar.
 
-Every adapter, no matter how ugly the site it scrapes, must emit `CampSession`
-objects. That single contract is what keeps the long tail of one-off provider
-pages from leaking their mess into the rest of the pipeline.
+Everything that reads a website must emit `CampSession` objects. That single
+contract is what keeps the mess of one-off provider pages from leaking into
+the rest of the program.
 
-Design notes:
+Two design notes carry most of the weight:
 
 * `CampSession.key` is a *stable* identity derived from content, not from any
   ID the source site happens to expose. Source IDs churn between seasons and
   are frequently absent; a content hash lets us recognise the same session
-  across runs and across sources (the same Fernbank week shows up both on the
-  aggregator and on Fernbank's own site).
-* `first_seen` / `last_seen` are deliberately *not* set by adapters. They are
-  owned by the delta layer, which is the only thing that knows about history.
-  Adapters describe the world as it is right now; they don't remember.
-* Nothing in this module holds information about a child. See docs/privacy.md.
+  across runs and across sources.
+* `first_seen` / `last_seen` are never set here. They belong to `store`, which
+  is the only thing that knows about history. A parser describes the world as
+  it is right now; it does not remember.
 """
 
 from __future__ import annotations
@@ -24,63 +22,67 @@ import re
 import unicodedata
 from datetime import date, datetime
 from enum import StrEnum
-from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
 __all__ = [
-    "RegistrationStatus",
-    "Provider",
     "CampSession",
+    "Provider",
+    "RegistrationStatus",
     "SessionRecord",
     "slugify",
 ]
 
 
-# --------------------------------------------------------------------------
-# helpers
-# --------------------------------------------------------------------------
-
 _NON_ALNUM = re.compile(r"[^a-z0-9]+")
-# Filler words that providers add or drop between seasons ("Camp Kingfisher
-# Summer Camp 2027" vs "Kingfisher Camp"). Stripping them before hashing makes
-# the identity survive marketing rewrites.
+
+# Filler words providers add or drop between seasons ("Camp Kingfisher Summer
+# Camp 2027" vs "Kingfisher Camp"). Stripping them before hashing makes the
+# identity survive marketing rewrites.
 _NOISE_WORDS = frozenset(
-    {"camp", "camps", "summer", "winter", "spring", "break", "week", "session", "the", "a", "an"}
+    {
+        "camp",
+        "camps",
+        "summer",
+        "winter",
+        "spring",
+        "fall",
+        "break",
+        "week",
+        "session",
+        "the",
+        "a",
+        "an",
+    }
 )
 
 
 def slugify(value: str) -> str:
-    """Lowercase ASCII slug. Used for provider identity and URL fragments."""
+    """Lowercase ASCII slug, used for identity and URL fragments."""
     normalized = unicodedata.normalize("NFKD", value)
     ascii_only = normalized.encode("ascii", "ignore").decode("ascii")
     return _NON_ALNUM.sub("-", ascii_only.lower()).strip("-")
 
 
-def _title_fingerprint(title: str) -> str:
-    """Normalise a session title down to its distinguishing words.
+def title_fingerprint(title: str) -> str:
+    """Reduce a session title to its distinguishing words.
 
-    Order is preserved rather than sorted: "Robotics for Girls" and
-    "Girls for Robotics" are plausibly different programmes, and collapsing
-    them would silently merge two real sessions.
+    Order is preserved rather than sorted: "Robotics for Girls" and "Girls for
+    Robotics" are plausibly different programmes, and collapsing them would
+    silently merge two real sessions.
     """
     tokens = [t for t in _NON_ALNUM.split(slugify(title)) if t and t not in _NOISE_WORDS]
     # A title made entirely of noise words ("Summer Camp") still needs to
-    # produce *something* stable, so fall back to the raw slug.
+    # produce something stable, so fall back to the raw slug.
     return "-".join(tokens) or slugify(title)
-
-
-# --------------------------------------------------------------------------
-# enums
-# --------------------------------------------------------------------------
 
 
 class RegistrationStatus(StrEnum):
     """How reachable a session is right now.
 
     `UNKNOWN` is the honest default and by far the most common value. Most
-    provider pages simply don't say, and guessing "open" would produce exactly
-    the false confidence this tool exists to prevent.
+    provider pages simply do not say, and guessing "open" would manufacture
+    exactly the false confidence this tool exists to prevent.
     """
 
     UNKNOWN = "unknown"
@@ -91,39 +93,22 @@ class RegistrationStatus(StrEnum):
     CLOSED = "closed"
 
 
-# --------------------------------------------------------------------------
-# core records
-# --------------------------------------------------------------------------
-
-
 class Provider(BaseModel):
-    """An organisation that runs camps. Roughly one per `sources.yaml` entry."""
+    """An organisation that runs camps. Roughly one per entry in camps.yaml."""
 
     model_config = ConfigDict(frozen=True)
 
-    slug: str = Field(description="Stable identifier, e.g. 'fernbank-science-center'.")
+    slug: str
     name: str
     homepage: HttpUrl | None = None
-    # Free-text because we resolve to coordinates lazily and cache the result;
-    # see docs/architecture.md on why geocoding is not part of ingestion.
-    locality: str | None = Field(
-        default=None, description="Human-readable area, e.g. 'Druid Hills' or 'Decatur'."
-    )
-    latitude: float | None = Field(default=None, ge=-90, le=90)
-    longitude: float | None = Field(default=None, ge=-180, le=180)
-
-    @model_validator(mode="after")
-    def _coords_come_in_pairs(self) -> Provider:
-        if (self.latitude is None) != (self.longitude is None):
-            raise ValueError("latitude and longitude must be provided together")
-        return self
+    locality: str | None = None
 
 
 class CampSession(BaseModel):
     """One bookable block of camp: a provider, a date range, an age range.
 
-    This is the unit a parent actually needs to make a decision about, which is
-    why it — rather than the camp or the provider — is the primary record.
+    This is the unit a parent makes a decision about, which is why it — rather
+    than the camp or the provider — is the primary record.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -133,26 +118,24 @@ class CampSession(BaseModel):
     start_date: date
     end_date: date
 
-    # Ages are the single most common eligibility filter and the single most
-    # common thing a provider page states vaguely ("rising 3rd-5th graders").
-    # Adapters are expected to convert grades to ages; None means "not stated",
-    # which the UI surfaces rather than hides.
+    # Ages are the most common eligibility filter and the thing provider pages
+    # state most vaguely ("rising 3rd-5th graders"). None means "not stated",
+    # which we surface rather than hide.
     min_age: int | None = Field(default=None, ge=0, le=21)
     max_age: int | None = Field(default=None, ge=0, le=21)
 
     # Times drive the aftercare problem: a camp ending at 15:00 is not a
-    # workday of coverage. Stored as plain strings ("09:00") because providers
-    # are wildly inconsistent and we would rather round-trip the original.
+    # workday of coverage. Plain strings ("09:00") because providers are wildly
+    # inconsistent and we would rather round-trip the original.
     daily_start: str | None = None
     daily_end: str | None = None
 
     price_usd: float | None = Field(default=None, ge=0)
     registration_status: RegistrationStatus = RegistrationStatus.UNKNOWN
-    registration_opens: date | None = None
 
     url: HttpUrl | None = None
     description: str | None = None
-    source_id: str = Field(description="Which adapter/source produced this record.")
+    source_id: str = Field(description="Which source produced this record.")
 
     @model_validator(mode="after")
     def _check_ranges(self) -> CampSession:
@@ -166,14 +149,13 @@ class CampSession(BaseModel):
     def key(self) -> str:
         """Content-derived identity, stable across runs and across sources.
 
-        Intentionally excludes price, status and description: those are the
+        Deliberately excludes price, status and description: those are the
         fields most likely to change on a session that is otherwise the same
         one. Including them would make every price tweak look like a brand-new
-        camp and flood the "New this week" panel with noise.
+        camp and flood the new-this-week column with noise.
         """
         material = (
-            f"{self.provider_slug}|{_title_fingerprint(self.title)}"
-            f"|{self.start_date.isoformat()}"
+            f"{self.provider_slug}|{title_fingerprint(self.title)}|{self.start_date.isoformat()}"
         )
         return hashlib.sha256(material.encode("utf-8")).hexdigest()[:16]
 
@@ -186,26 +168,12 @@ class CampSession(BaseModel):
         """Whether this session provides childcare on `day`."""
         return self.start_date <= day <= self.end_date
 
-    def suits_age(self, age: int) -> bool:
-        """Whether a child of `age` is eligible.
-
-        Unstated bounds are treated as permissive. This is deliberate: the
-        pipeline optimises for recall, and a camp wrongly shown costs a parent
-        two seconds, while one wrongly hidden can cost a week of childcare.
-        """
-        if self.min_age is not None and age < self.min_age:
-            return False
-        if self.max_age is not None and age > self.max_age:  # noqa: SIM103
-            return False
-        return True
-
 
 class SessionRecord(BaseModel):
-    """A `CampSession` plus the history the delta layer maintains for it.
+    """A `CampSession` plus the history the store maintains for it.
 
-    Splitting this from `CampSession` keeps adapters honest — they cannot
-    accidentally fabricate a `first_seen` — and makes the persisted format
-    self-describing.
+    Keeping this separate from `CampSession` stops a parser from fabricating a
+    `first_seen`, and makes the persisted format self-describing.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -214,17 +182,3 @@ class SessionRecord(BaseModel):
     session: CampSession
     first_seen: datetime = Field(description="UTC timestamp of the run that first saw this key.")
     last_seen: datetime = Field(description="UTC timestamp of the most recent run that saw it.")
-
-    @property
-    def is_stale(self) -> bool:
-        """True when the last run did not see this session.
-
-        Stale records are kept rather than deleted: a session vanishing is
-        itself information (it usually means "sold out and delisted"), and
-        deleting it would make it reappear as new if the provider restores
-        the page.
-        """
-        return self.last_seen < self.first_seen
-
-
-Slug = Annotated[str, Field(pattern=r"^[a-z0-9]+(-[a-z0-9]+)*$")]

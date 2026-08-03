@@ -1,172 +1,204 @@
-"""Smoke tests for argument parsing.
+"""End to end: config in, TSV out, without a socket.
 
-These exist because of a real failure: `--verbose` was originally declared only
-on the top-level parser, so `campradar refresh --verbose` was rejected while
-`campradar --verbose refresh` worked. Nothing caught it until it broke a
-scheduled GitHub Actions run, because the unit tests all called the library
-directly and never went through the parser.
-
-Mostly parsing, plus the command paths that never touch the network, so
-these stay fast and offline.
+The Fetcher is real; only its transport is mocked. That keeps the caching and
+throttling code on the tested path rather than stubbing past it.
 """
 
 from __future__ import annotations
 
-from pathlib import Path
-
+import httpx
 import pytest
 
-from campradar.cli import (
-    _probe_targets,
-    build_parser,
-    cmd_export,
-    cmd_probe,
-    cmd_refresh,
-)
+from campradar import cli
+from campradar.cli import COLUMNS
+from campradar.fetch import Fetcher, FetchError
+
+PAGE_URL = "https://example.org/camps"
+
+CAMPS_YAML = """
+providers:
+  - slug: example-camps
+    name: Example Camps (fixture)
+    homepage: https://example.org/
+sources:
+  - id: example-camps
+    provider_slug: example-camps
+    adapter: jsonld
+    enabled: true
+    urls:
+      - https://example.org/camps
+"""
 
 
-def parse(argv: list[str]):
-    return build_parser().parse_args(argv)
+@pytest.fixture
+def workspace(tmp_path, control_html, monkeypatch):
+    """A throwaway repo whose one source serves the control fixture."""
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config" / "camps.yaml").write_text(CAMPS_YAML)
 
-
-class TestFlagPlacement:
-    """Global flags must work on either side of the subcommand."""
-
-    @pytest.mark.parametrize(
-        "argv",
-        [
-            ["refresh", "--verbose"],   # the ordering CI used, and the one that broke
-            ["--verbose", "refresh"],
-            ["refresh", "-v"],
-            ["-v", "refresh"],
-        ],
+    dates = tmp_path / "config" / "dates.yaml"
+    dates.write_text(
+        "breaks:\n"
+        "  - {slug: fall-break, name: Fall Break, start: 2026-10-05, end: 2026-10-09}\n"
+        "  - {slug: winter-break, name: Winter Break, start: 2026-12-21, end: 2027-01-04}\n"
+        "  - {slug: february-break, name: February Break,"
+        " start: 2027-02-15, end: 2027-02-19}\n"
     )
-    def test_verbose_accepted_in_any_position(self, argv):
-        assert parse(argv).verbose is True
 
-    @pytest.mark.parametrize(
-        "argv",
-        [
-            ["refresh", "--config", "custom"],
-            ["--config", "custom", "refresh"],
-        ],
+    def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url) == PAGE_URL:
+            return httpx.Response(200, text=control_html)
+        return httpx.Response(404)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    monkeypatch.setattr(
+        cli, "Fetcher", lambda cache, **kw: Fetcher(cache, delay_seconds=0, client=client)
     )
-    def test_config_accepted_in_any_position(self, argv):
-        assert parse(argv).config == Path("custom")
+    return tmp_path
 
-    @pytest.mark.parametrize(
-        "argv",
+
+def run(workspace, *args: str) -> int:
+    return cli.main(
         [
-            ["refresh", "--data", "elsewhere"],
-            ["--data", "elsewhere", "refresh"],
-        ],
-    )
-    def test_data_accepted_in_any_position(self, argv):
-        assert parse(argv).data == Path("elsewhere")
-
-    def test_flags_work_on_every_subcommand(self):
-        assert parse(["probe", "https://example.org", "--verbose"]).verbose is True
-        assert parse(["export", "--verbose"]).verbose is True
-
-
-class TestDefaultsSurviveSubparsers:
-    """The SUPPRESS trick: a subparser must not clobber the parent's value."""
-
-    def test_leading_flag_is_not_overwritten_by_subparser_default(self):
-        """`--config custom refresh` must not silently fall back to `config/`."""
-        assert parse(["--config", "custom", "refresh"]).config == Path("custom")
-
-    def test_defaults_apply_when_no_flag_given(self):
-        args = parse(["refresh"])
-        assert args.config == Path("config")
-        assert args.data == Path("data")
-        assert args.verbose is False
-
-
-class TestDispatch:
-    def test_each_subcommand_binds_its_handler(self):
-        assert parse(["refresh"]).func is cmd_refresh
-        assert parse(["probe", "https://example.org"]).func is cmd_probe
-        assert parse(["export"]).func is cmd_export
-
-    def test_subcommand_is_required(self):
-        with pytest.raises(SystemExit):
-            parse([])
-
-    def test_unknown_subcommand_is_rejected(self):
-        with pytest.raises(SystemExit):
-            parse(["frobnicate"])
-
-
-class TestSubcommandOptions:
-    def test_probe_url_is_optional(self):
-        """`make probe` runs bare — a required positional made the target unusable."""
-        assert parse(["probe"]).url is None
-
-    def test_probe_accepts_a_single_url(self):
-        assert parse(["probe", "https://example.org"]).url == "https://example.org"
-
-    def test_export_output_defaults_and_overrides(self):
-        assert parse(["export"]).output == Path("camps.ics")
-        assert parse(["export", "-o", "spring.ics"]).output == Path("spring.ics")
-
-    def test_refresh_site_data_default(self):
-        assert parse(["refresh"]).site_data == Path("site/assets/data")
-
-
-class TestProbeTargets:
-    """`campradar probe` with no URL surveys sources.yaml.
-
-    This is what `make probe` invokes, and it regressed once already: the
-    Makefile and README both documented a whole-config survey while the parser
-    demanded a positional URL, so the target could never succeed.
-    """
-
-    @staticmethod
-    def write_config(tmp_path: Path, body: str) -> Path:
-        config = tmp_path / "config"
-        config.mkdir()
-        (config / "sources.yaml").write_text(body, encoding="utf-8")
-        return config
-
-    def test_disabled_sources_are_included(self, tmp_path):
-        """Retired and placeholder entries are the point of probing, not noise."""
-        config = self.write_config(
-            tmp_path,
-            """
-            sources:
-              - id: on-by-default
-                adapter: jsonld
-                urls: [https://a.example/camps]
-              - id: retired
-                adapter: jsonld
-                enabled: false
-                urls: [https://b.example/camps]
-            """,
-        )
-        assert _probe_targets(config) == [
-            ("on-by-default", "https://a.example/camps", True),
-            ("retired", "https://b.example/camps", False),
+            "--camps",
+            str(workspace / "config" / "camps.yaml"),
+            "--dates",
+            str(workspace / "config" / "dates.yaml"),
+            "--state",
+            str(workspace / "data" / "camps.json"),
+            *args,
         ]
+    )
 
-    def test_every_url_of_a_multi_url_source_is_probed(self, tmp_path):
-        config = self.write_config(
-            tmp_path,
-            """
-            sources:
-              - id: two-pages
-                adapter: jsonld
-                enabled: true
-                urls: [https://a.example/one, https://a.example/two]
-            """,
-        )
-        assert [url for _id, url, _on in _probe_targets(config)] == [
-            "https://a.example/one",
-            "https://a.example/two",
-        ]
 
-    def test_empty_config_is_an_error_not_a_silent_pass(self, tmp_path):
-        """Exiting 0 here would let `make probe && make update` look healthy."""
-        config = self.write_config(tmp_path, "sources: []\n")
-        args = parse(["probe", "--config", str(config), "--data", str(tmp_path / "data")])
-        assert cmd_probe(args) == 1
+def tsv(capsys) -> list[list[str]]:
+    # Strip newlines only. A plain .strip() would eat the trailing tab of a row
+    # whose last column is empty, and silently under-count its cells.
+    out = capsys.readouterr().out.strip("\n").split("\n")
+    return [line.split("\t") for line in out]
+
+
+def test_update_then_list(workspace, capsys):
+    assert run(workspace, "update", "--cache", str(workspace / "cache")) == 0
+    capsys.readouterr()
+
+    assert run(workspace, "list") == 0
+    rows = tsv(capsys)
+
+    assert rows[0] == list(COLUMNS)
+    assert len(rows) == 5  # header plus the four control sessions
+    assert all(len(row) == len(COLUMNS) for row in rows)
+
+
+def test_list_is_sorted_by_start_date(workspace, capsys):
+    run(workspace, "update", "--cache", str(workspace / "cache"))
+    capsys.readouterr()
+    run(workspace, "list")
+    rows = tsv(capsys)[1:]
+
+    starts = [row[COLUMNS.index("start_date")] for row in rows]
+    assert starts == sorted(starts)
+
+
+def test_break_and_day_columns_are_filterable(workspace, capsys):
+    run(workspace, "update", "--cache", str(workspace / "cache"))
+    capsys.readouterr()
+    run(workspace, "list")
+    rows = tsv(capsys)[1:]
+
+    by_break = {row[COLUMNS.index("breaks")]: row for row in rows}
+    assert "fall-break" in by_break
+    assert "" in by_break  # the March robotics workshop covers nothing needed
+
+    art = next(r for r in rows if r[COLUMNS.index("breaks")] == "february-break")
+    # Five-day session, three needed days. The two columns disagree on purpose.
+    assert art[COLUMNS.index("needed_days")] == "2027-02-15,2027-02-16,2027-02-17"
+
+
+def test_everything_is_new_on_the_first_run_and_not_on_the_second(workspace, capsys):
+    cache = str(workspace / "cache")
+    run(workspace, "update", "--cache", cache)
+    capsys.readouterr()
+    run(workspace, "list")
+    assert {row[COLUMNS.index("is_new")] for row in tsv(capsys)[1:]} == {"1"}
+
+    run(workspace, "update", "--cache", cache)
+    capsys.readouterr()
+    run(workspace, "list")
+    assert {row[COLUMNS.index("is_new")] for row in tsv(capsys)[1:]} == {"0"}
+
+
+def test_diff_summary_goes_to_stderr_so_stdout_stays_pipeable(workspace, capsys):
+    run(workspace, "update", "--cache", str(workspace / "cache"))
+    captured = capsys.readouterr()
+    assert "4 new" in captured.err
+    assert captured.out == ""
+
+
+def test_list_before_update_fails_cleanly(workspace, capsys):
+    assert run(workspace, "list") == 1
+    assert "run `campradar update`" in capsys.readouterr().err
+
+
+def test_a_dead_source_fails_the_run_without_writing_state(workspace, capsys):
+    """Overwriting good state with an empty scrape is the expensive mistake."""
+    (workspace / "config" / "camps.yaml").write_text(
+        CAMPS_YAML.replace("https://example.org/camps", "https://example.org/gone")
+    )
+    assert run(workspace, "update", "--cache", str(workspace / "cache")) == 1
+    assert "state not written" in capsys.readouterr().err
+    assert not (workspace / "data" / "camps.json").exists()
+
+
+def test_unknown_provider_slug_is_a_config_error(workspace, capsys):
+    (workspace / "config" / "camps.yaml").write_text(
+        CAMPS_YAML.replace("provider_slug: example-camps", "provider_slug: typo")
+    )
+    assert run(workspace, "update", "--cache", str(workspace / "cache")) == 1
+    assert "unknown provider_slug" in capsys.readouterr().err
+
+
+def test_tabs_in_a_title_cannot_break_the_table(workspace, capsys, monkeypatch):
+    from campradar.store import merge, save_state
+    from conftest import RUN_ONE, make_session
+
+    state, _ = merge({}, [make_session("Messy\tTitle\nSecond line")], now=RUN_ONE)
+    save_state(workspace / "data" / "camps.json", state, now=RUN_ONE)
+
+    run(workspace, "list")
+    rows = tsv(capsys)
+    assert len(rows) == 2
+    assert len(rows[1]) == len(COLUMNS)
+
+
+# --------------------------------------------------------------------------
+# fetch
+# --------------------------------------------------------------------------
+
+
+def test_not_modified_serves_the_cached_body(tmp_path):
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request.headers.get("If-None-Match"))
+        if request.headers.get("If-None-Match") == '"v1"':
+            return httpx.Response(304)
+        return httpx.Response(200, text="hello", headers={"ETag": '"v1"'})
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    fetcher = Fetcher(tmp_path / "cache", delay_seconds=0, client=client)
+
+    first = fetcher.get("https://example.org/x")
+    second = fetcher.get("https://example.org/x")
+
+    assert first.from_cache is False
+    assert second.from_cache is True
+    assert second.text == "hello"
+    assert calls == [None, '"v1"']
+
+
+def test_an_http_error_is_raised_not_swallowed(tmp_path):
+    client = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(500)))
+    fetcher = Fetcher(tmp_path / "cache", delay_seconds=0, client=client)
+    with pytest.raises(FetchError, match="500"):
+        fetcher.get("https://example.org/x")
