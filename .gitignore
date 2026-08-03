@@ -1,37 +1,33 @@
 # ---------------------------------------------------------------------------
-# Anything that could contain information about a child. See docs/privacy.md.
-# These patterns come first so they are impossible to miss when auditing.
+# Privacy first, so it is impossible to miss when auditing.
+#
+# Nothing in this repository holds information about a child, and no code here
+# reads these files. The patterns are a guardrail against that changing by
+# accident — if a local override file ever appears, it stays local.
 # ---------------------------------------------------------------------------
-config/kids.local.yaml
 config/*.local.yaml
 *.private.json
 
-# Fetched pages. Regenerable, large, and occasionally contains provider
-# contact details we have no business republishing.
-data/raw/
+# ---------------------------------------------------------------------------
+# Fetched pages. Regenerable, large, and occasionally carry provider contact
+# details we have no business republishing.
+#
+# NOTE: data/camps.json is deliberately NOT ignored. It carries first_seen
+# between runs, so ignoring it would re-report every camp as new on every
+# fresh clone.
+# ---------------------------------------------------------------------------
+data/cache/
 
-# Run log. Previously committed, which was a mistake: httpx logs full request
-# URLs, and any API key travelling in a query string would land in git history
-# on a public repo. Redaction in campradar/redact.py is the primary defence;
-# not committing the log is the second one. Both, because a leaked credential
-# cannot be un-pushed.
-data/refresh.log
-
-# Python
+# --- python ----------------------------------------------------------------
 __pycache__/
 *.py[cod]
-.pytest_cache/
-.ruff_cache/
 *.egg-info/
+build/
+dist/
 .venv/
 venv/
+.pytest_cache/
+.ruff_cache/
 
-# Jekyll
-site/_site/
-site/.jekyll-cache/
-.bundle/
-vendor/
-
-# Local output
-camps.ics
+# --- editors / os ----------------------------------------------------------
 .DS_Store

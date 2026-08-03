@@ -1,215 +1,192 @@
 # Camp Radar
 
-Keeps track of what camps exist for DeKalb County school breaks — and, more
-usefully, which ones are **new since last week**.
+Keeps track of which camps exist for DeKalb County school breaks — and, more
+usefully, which ones are **new since last run**.
 
 Built for a specific problem: metro Atlanta camps open registration between
-September and February and sell out fast, and the hard part isn't choosing
-between camps, it's finding out a camp exists before it's full.
+September and February and sell out fast, and the hard part is not choosing
+between camps, it is finding out a camp exists before it is full.
 
-## What it does
+This is the command-line core, and nothing else. Three moving parts:
 
-- Scrapes camp listings from provider sites, aggregators and registration
-  platforms into one normalised schema.
-- Tracks `first_seen` per session, so the dashboard can show **what appeared
-  since last run** rather than an undifferentiated wall of camps.
-- Maps sessions against the school break calendar and shows which break days
-  still have nothing covering them.
-- Publishes a static dashboard with an `.ics` export.
-
-## Privacy
-
-**No information about a child ever enters this repository or the published
-site.** Kid profiles live in your browser's `localStorage` (web) or in a
-gitignored `config/kids.local.yaml` (CLI). The dashboard is static, has no
-backend, and makes exactly one network request — for the camp data itself.
-
-This is why the repo can safely be public. Making it private would cost money
-(Pages from private repos needs GitHub Pro), still wouldn't make the *site*
-private, and wouldn't protect anything the current design doesn't already
-protect. Full reasoning in [docs/privacy.md](docs/privacy.md).
-
-## Quick start
-
-```bash
-git clone https://github.com/lskatz/campradar
-cd campradar
-pip install -e ".[dev]"
-pytest -q                                  # 77 tests, ~1s
-
-# The repo ships with sample data, so the dashboard renders immediately:
-python3 -m http.server -d site 8000        # → http://localhost:8000
-```
-
-No install needed if you'd rather not — `python -m` works straight from the
-source tree, which is handy inside a pixi or conda shell:
-
-```bash
-PYTHONPATH=src python -m campradar refresh --verbose
-```
-
-To pull real data, enable sources in `config/sources.yaml` and run:
-
-```bash
-campradar refresh --verbose
-```
-
-## Workflow: refresh locally, then push
-
-Data collection happens on your machine. CI only publishes what you pushed, so
-what's live is always something you reviewed — and Actions needs no network
-access to providers, no schedule, and no write access to the repo.
-
-```bash
-make probe      # which configured sources actually expose usable data
-make update     # test, refresh, show what changed, commit, push
-```
-
-`make update` runs the tests *before* fetching, so a broken parser can't
-overwrite good data. **It never runs git** — it reports what changed and prints
-the commands to run:
-
-```
-==> Files changed
-   M site/assets/data/sessions.json
-  ?? data/state.json
-
-==> Ready to publish
-    git add data site
-    git commit -m "refresh 2026-07-29: 3 new"
-    git push
-```
-
-Staging, committing and pushing stay entirely yours.
-
-`data/state.json` is committed — it's what carries `first_seen` between runs.
-`data/refresh.log` is not; it's regenerated every time.
-
-### Checking sources
-
-`make probe` (or `campradar probe`) walks every source in `sources.yaml`,
-including disabled ones, and reports which are worth turning on:
-
-```
-[off] dunwoody-nature-center-camps
-        12 usable event(s)  https://dunwoodynature.org/camps/
-           - Pond Explorers
-           - Wilderness Skills
-[off] callanwolde-camps
-       no usable JSON-LD  https://callanwolde.org/camps/
-           needs a bespoke adapter — docs/adding-a-source.md
-
-1 disabled source(s) look usable: dunwoody-nature-center-camps
-```
-
-Pass a single URL to probe just that page: `campradar probe https://...`.
-
-### If you'd rather CI did the scraping
-
-There is deliberately no scheduled scraping workflow in this repo. `deploy.yml`
-is the only workflow: it runs the tests, checks the site has data, and publishes
-`site/`. It has no schedule, no provider network access, and `contents: read` —
-it cannot write to the repository even by accident.
-
-That is the property worth keeping. Because collection happens on your machine,
-every published change passed through a diff you looked at, and a provider
-changing their HTML breaks a command you ran on purpose rather than a cron job
-you find out about three weeks later.
-
-## Reading the data directly
-
-The published file is public and CORS-open:
-
-```bash
-URL=https://lskatz.github.io/campradar/assets/data/sessions.json
-
-# how many camps, and how the last run went
-curl -s $URL | python3 -c "import json,sys; d=json.load(sys.stdin); print(len(d['sessions']),'sessions'); print(d['run'])"
-
-# just what's new
-curl -s $URL | python3 -c "import json,sys; [print(s['start_date'], s['title']) for s in json.load(sys.stdin)['sessions'] if s['is_new']]"
-```
-
-The same snippets appear on the site itself, with the URL filled in.
-
-## Commands
-
-| Command | What it does |
+| File | What it is |
 |---|---|
-| `make update` | Test + refresh, then print the git commands to run |
-| `make probe` | Check every configured source for usable data |
-| `make serve` | Preview the dashboard locally |
-| `make doctor` | Diagnose which copy of the code is running |
-| `campradar refresh` | Fetch all enabled sources, update state, write site data |
-| `campradar probe [url]` | Probe one page, or every configured source |
-| `campradar active-doctor` | Find out whether your ACTIVE key can read the API at all |
-| `campradar export -o camps.ics` | Write an `.ics` from current state |
+| `config/camps.yaml` | where to look for camps |
+| `config/dates.yaml` | which days you need covered |
+| `data/camps.json` | the local file, updated in place |
 
-## Layout
+## Install
 
-```
-config/
-  sources.yaml        # providers and sources — usually the only file you edit
-  breaks.yaml         # school break dates, typed by hand once a year
-  kids.example.yaml   # template; copy to kids.local.yaml (gitignored)
-src/campradar/
-  models.py           # the CampSession contract every adapter must satisfy
-  fetch.py            # cached, throttled HTTP
-  delta.py            # first_seen tracking — the part that solves discovery
-  pipeline.py         # sequencing and failure policy
-  icsgen.py           # calendar output
-  adapters/
-    base.py           # adapter contract
-    jsonld.py         # generic schema.org reader — covers many sites at once
-site/                 # static dashboard, no build step
-scripts/update.sh     # the local refresh-and-publish loop
-data/state.json       # committed; carries first_seen between runs
+```sh
+pip install -e ".[dev]"
+pytest                    # 68 tests, under a second
 ```
 
-## If `campradar` and `make` disagree
+## Use
 
-The `make` targets run the code in this checkout via `PYTHONPATH=src`, on
-purpose. A non-editable `pip install .` copies the code into site-packages,
-where it shadows the source tree and makes your edits appear to do nothing —
-`campradar probe` failing with "the following arguments are required: url"
-while `make probe` works is the classic symptom.
-
-```bash
-make doctor                        # shows which copy each path resolves to
-pip install -e . --force-reinstall # fix a stale install
+```sh
+campradar update          # fetch every enabled source, update data/camps.json
+campradar list            # print the local file as TSV
 ```
 
-## Adding camps
+`update` writes its summary to stderr and `list` writes to stdout, so this
+stays clean:
 
-Most sources need no code — a lot of sites expose schema.org markup they don't
-know they have. Run `campradar probe <url>`; if it reports anything usable, you
-just add a few lines to `sources.yaml`. See
-[docs/adding-a-source.md](docs/adding-a-source.md).
+```sh
+campradar update && campradar list > camps.tsv
+```
+
+A run looks like:
+
+```
+  example-camps: 4 session(s)
+4 new, 0 newly open, 0 disappeared (4 total) -> data/camps.json
+  + 2026-10-05 Fall Break Discovery Camp
+  + 2026-12-21 Winter Wonders Half-Week
+```
+
+## The TSV
+
+One header row, tab-separated, empty string for anything missing. Column order
+is the tool's public contract; new columns get appended at the end so that
+anything parsing by position keeps working.
+
+```
+key  first_seen  is_new  start_date  end_date  breaks  needed_days
+title  provider  source_id  min_age  max_age  daily_start  daily_end
+price_usd  status  url
+```
+
+All dates are ISO-8601. `first_seen` is a full UTC timestamp.
+
+`breaks` and `needed_days` are the two ways to ask about coverage, and they
+deliberately disagree. `breaks` holds the slugs from `dates.yaml` that a
+session overlaps. `needed_days` holds the actual days off it covers — so a
+Saturday-to-Wednesday camp overlapping a Monday-to-Friday break shows five
+session days but only three needed days.
+
+Filtering is `awk` for now, scoped to a column rather than a bare `grep`,
+since a naive line match on a date would also hit `start_date` and
+`first_seen`:
+
+```sh
+# everything covering Fall Break
+campradar list | awk -F'\t' 'NR==1 || $6 ~ /fall-break/'
+
+# everything covering one exact day
+campradar list | awk -F'\t' 'NR==1 || $7 ~ /2027-02-16/'
+
+# anything at all covering a day you need
+campradar list | awk -F'\t' 'NR==1 || $7 != ""'
+
+# what showed up since last run
+campradar list | awk -F'\t' 'NR==1 || $3 == 1'
+```
+
+A future `--break` / `--date` filter would do exactly this in Python. Same
+semantics, no schema change.
+
+## Adding a camp
+
+Name the provider, then point a source at the page that lists their sessions:
+
+```yaml
+providers:
+  - slug: dunwoody-nature-center
+    name: Dunwoody Nature Center
+
+sources:
+  - id: dunwoody-camps
+    provider_slug: dunwoody-nature-center
+    adapter: jsonld
+    enabled: true
+    urls:
+      - https://dunwoodynature.org/education/camp-programs/
+```
+
+The one parser reads schema.org JSON-LD, which a surprising number of sites
+publish for SEO without knowing it. Whether a given site will work:
+
+```sh
+curl -s https://their-site.example/camps | grep -c 'application/ld+json'
+```
+
+If that is zero, no amount of configuration will help and the site needs its
+own parser. `sources.enabled: false` retires a source without losing the
+knowledge of it.
+
+## Editing `dates.yaml`
+
+`slug` is the stable handle that appears in the `breaks` column and **must not
+change** once written. `name` is display text and can be retyped freely. `end`
+is inclusive and means the last day students are out — the day before a
+semester restarts, not the restart itself.
+
+## Testing
+
+68 tests, no network, no real clock. Two of them are positive controls and the
+rest are boundary cases.
+
+**The parse control.** `tests/fixtures/example_camps.html` is a saved listing
+page carrying the four kinds of junk real sites ship: a listing with no start
+date, a non-event type, a syntactically broken script block, and a `@graph`
+wrapper. `example_camps.expected.json` says exactly what it must produce,
+including the content-hash `key` of every session. Those keys are frozen on
+purpose — if one changes, the fingerprinting logic changed, and the next run
+would silently re-report the entire catalogue as new.
+
+**The merge control.** A fixed pair of runs on a pinned clock, asserting the
+diff is exactly `1 new, 1 newly open, 1 disappeared` and that `first_seen` on
+the unchanged record did not move.
+
+Output is TAP:
+
+```sh
+pytest --tap-stream
+prove --exec 'pytest --tap-stream' tests/     # if you would rather use prove
+```
+
+```
+1..68
+ok 1 tests/test_cli.py::test_update_then_list
+ok 2 tests/test_cli.py::test_list_is_sorted_by_start_date
+```
+
+To watch the whole thing work without touching the network, serve the control
+fixture and point a source at it:
+
+```sh
+python3 -m http.server -d tests/fixtures 8765 &
+# set urls: [http://127.0.0.1:8765/example_camps.html] in camps.yaml
+campradar update --delay 0 && campradar list
+```
 
 ## Design notes
 
-Three decisions explain most of the code, and each is argued out in
-[docs/architecture.md](docs/architecture.md):
-
-**Recall over precision.** A camp wrongly shown costs two seconds of scrolling;
-one wrongly hidden can cost a week of childcare. Unstated age ranges are
-treated as permissive, and ambiguity resolves toward including the session.
+**Recall over precision.** A camp wrongly shown costs two seconds of
+scrolling; one wrongly hidden can cost a week of childcare. Unstated age
+ranges are permissive, and ambiguity resolves toward including the session.
 
 **The diff is the product.** A full catalogue looks the same every week and
-nobody reads it. `first_seen` is a first-class field, not a log line.
+nobody reads it. `first_seen` is a first-class field, not a log line, and
+`camps.json` is committed because it is what carries that history between
+runs.
 
 **Fail loudly per source, quietly per row.** A malformed listing is skipped; a
-dead site is reported. The run only fails outright when everything fails —
-and in that case state isn't written, because overwriting good state with an
-empty scrape would mark every camp as disappeared and then re-report them all
-as new.
+dead site is reported. The run fails outright only when *every* source fails —
+and in that case state is not written at all, because overwriting good state
+with an empty scrape would mark every camp as disappeared and then re-report
+them all as new.
+
+**Nothing about a child is in this repository.** No kid profiles, no ages, no
+preferences. Filtering by age is something you do to the TSV.
 
 ## Caveats
 
-Scraped dates, prices and availability are often stale or wrong. **Confirm with
-the provider before planning around anything here.** Break dates in
-`breaks.yaml` are transcribed by hand and should be checked against the
-official calendar and your own school's.
+Scraped dates, prices and availability are often stale or wrong. **Confirm
+with the provider before planning around anything here.** Break dates in
+`dates.yaml` are transcribed by hand and should be checked against the
+official district calendar and your own school's.
 
 ## License
 
