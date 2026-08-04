@@ -1,0 +1,123 @@
+<!doctype html>
+<!--
+  POSITIVE CONTROL. Do not regenerate this file casually.
+
+  It is a realistic camp listing page, deliberately including the four kinds of
+  junk that real sites ship: an object with no start date, a non-event type, a
+  syntactically broken script block, and a @graph wrapper. Parsing it must
+  produce exactly the four sessions in example_camps.expected.json, with those
+  exact keys.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Camps &amp; Programs | Example Camps</title>
+
+  <!-- A perfectly ordinary listing. -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Event",
+    "name": "Fall Break Discovery Camp",
+    "startDate": "2026-10-05T09:00:00-04:00",
+    "endDate": "2026-10-09T15:30:00-04:00",
+    "typicalAgeRange": "Ages 6-12",
+    "url": "https://example.org/camps/fall-break-discovery",
+    "description": "Five days of field science along the creek.",
+    "offers": {
+      "@type": "Offer",
+      "price": "285.00",
+      "priceCurrency": "USD",
+      "availability": "https://schema.org/InStock"
+    }
+  }
+  </script>
+
+  <!-- Grades rather than ages, and sold out. -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Course",
+    "name": "Winter Wonders Half-Week",
+    "startDate": "2026-12-21",
+    "endDate": "2026-12-23",
+    "description": "Three mornings of making, for rising grades 3-5.",
+    "offers": {
+      "@type": "Offer",
+      "lowPrice": "$150",
+      "availability": "SoldOut"
+    }
+  }
+  </script>
+
+  <!-- Two objects in one array: one usable, one with no start date at all. -->
+  <script type="application/ld+json">
+  [
+    {
+      "@context": "https://schema.org",
+      "@type": "Event",
+      "name": "Robotics Weekend Workshop",
+      "startDate": "2027-03-20",
+      "endDate": "2027-03-21",
+      "typicalAgeRange": "9-14"
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "Event",
+      "name": "Registration Opens Soon",
+      "description": "Dates to be announced."
+    }
+  ]
+  </script>
+
+  <!-- A @graph wrapper, which plugins emit constantly. The session inside runs
+       Saturday to Wednesday, so it covers only part of February Break. -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebPage",
+        "name": "Camps &amp; Programs"
+      },
+      {
+        "@type": "EventSeries",
+        "name": "Presidents Week Art Studio",
+        "startDate": "2027-02-13",
+        "endDate": "2027-02-17",
+        "typicalAgeRange": "ages 5 to 11",
+        "url": "https://example.org/camps/presidents-week-art",
+        "offers": {
+          "@type": "Offer",
+          "price": "310",
+          "availability": "https://schema.org/LimitedAvailability"
+        }
+      }
+    ]
+  }
+  </script>
+
+  <!-- Not an event. -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Example Camps",
+    "url": "https://example.org/"
+  }
+  </script>
+
+  <!-- Syntactically broken. A real site had a trailing comma for two years. -->
+  <script type="application/ld+json">
+  {
+    "@type": "Event",
+    "name": "Broken Block",
+    "startDate": "2027-04-05",
+  }
+  </script>
+</head>
+<body>
+  <h1>Camps &amp; Programs</h1>
+  <p>Registration for school-break camps opens in September.</p>
+</body>
+</html>

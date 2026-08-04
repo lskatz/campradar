@@ -1,0 +1,92 @@
+# Where to look for camps.
+#
+# Adding a camp is normally a change to this file alone: name the provider,
+# then point one source at the page that lists their sessions. If that page
+# publishes schema.org JSON-LD, it will just work. If it does not, no amount of
+# configuration will help and the site needs its own parser.
+#
+# Quickest way to find out:
+#
+#     curl -s https://their-site.example/camps | grep -c 'application/ld+json'
+#
+# Order matters. When the same session is reachable through two sources, the
+# one listed first wins, so put provider sites above aggregators — providers
+# are authoritative about their own dates and prices.
+#
+# `enabled: false` retires a source without losing the knowledge of it, which
+# is useful when a site is mid-redesign.
+
+providers:
+  - slug: example-camps
+    name: Example Camps (fixture)
+    homepage: https://example.org/
+    locality: Decatur
+
+  - slug: fernbank-science-center
+    name: Fernbank Science Center
+    homepage: https://www.fernbank.edu/
+    locality: Druid Hills
+
+  - slug: dunwoody-nature-center
+    name: Dunwoody Nature Center
+    homepage: https://dunwoodynature.org/
+    locality: Dunwoody
+
+  - slug: callanwolde
+    name: Callanwolde Fine Arts Center
+    homepage: https://callanwolde.org/
+    locality: Druid Hills
+
+  - slug: zoo-atlanta
+    name: Zoo Atlanta
+    homepage: https://zooatlanta.org/
+    locality: Grant Park
+
+sources:
+  # The positive control. Disabled, because example.org does not serve it —
+  # the page lives at tests/fixtures/example_camps.html and is exercised by the
+  # test suite, not by a live fetch. To see the tool work end to end without a
+  # network, serve the fixture yourself:
+  #
+  #     python3 -m http.server -d tests/fixtures 8000
+  #     campradar update  # after pointing this url at localhost:8000
+  - id: example-camps
+    provider_slug: example-camps
+    adapter: jsonld
+    enabled: false
+    urls:
+      - https://example.org/camps
+
+  # --- real sources -------------------------------------------------------
+  # All disabled until confirmed to publish JSON-LD. Each was checked once and
+  # the finding is recorded so re-enabling is a decision made from notes.
+
+  - id: fernbank-camps
+    provider_slug: fernbank-science-center
+    adapter: jsonld
+    enabled: false   # unverified
+    urls:
+      - https://www.fernbank.edu/
+
+  - id: dunwoody-nature-center-camps
+    provider_slug: dunwoody-nature-center
+    adapter: jsonld
+    enabled: false   # prose only, no structured markup as of 2026-07
+    urls:
+      - https://dunwoodynature.org/education/camp-programs/
+
+  - id: callanwolde-camps
+    provider_slug: callanwolde
+    adapter: jsonld
+    enabled: false   # summer-only page; real listings live on an ACTIVE portal
+    urls:
+      - https://callanwolde.org/classes/camps/
+
+  - id: zoo-atlanta-camps
+    provider_slug: zoo-atlanta
+    adapter: jsonld
+    enabled: false   # programme pages are prose; no JSON-LD as of 2026-07
+    urls:
+      - https://zooatlanta.org/program/fall-camp/
+      - https://zooatlanta.org/program/winter-camp/
+      - https://zooatlanta.org/program/spring-break-camp/

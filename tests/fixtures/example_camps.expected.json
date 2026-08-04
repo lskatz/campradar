@@ -1,0 +1,76 @@
+{
+  "_comment": [
+    "Frozen expected output for example_camps.html. Every field here was",
+    "written by reading the fixture, not by recording whatever the parser",
+    "happened to emit.",
+    "",
+    "The `key` values are the exception: they are SHA-256 digests and had to be",
+    "computed once. They are frozen deliberately. If a key changes, the content",
+    "fingerprint changed, which would silently re-report the entire catalogue as",
+    "new on the next run. That is the single most expensive bug this project",
+    "can have, and this file is the tripwire for it."
+  ],
+  "source_id": "example-camps",
+  "provider_slug": "example-camps",
+  "fallback_url": "https://example.org/camps",
+  "sessions": [
+    {
+      "key": "ebe5ba04f1f5941f",
+      "title": "Fall Break Discovery Camp",
+      "start_date": "2026-10-05",
+      "end_date": "2026-10-09",
+      "min_age": 6,
+      "max_age": 12,
+      "price_usd": 285.0,
+      "registration_status": "open",
+      "url": "https://example.org/camps/fall-break-discovery",
+      "breaks": ["fall-break"],
+      "needed_days": [
+        "2026-10-05",
+        "2026-10-06",
+        "2026-10-07",
+        "2026-10-08",
+        "2026-10-09"
+      ]
+    },
+    {
+      "key": "8c39b79db380d2d2",
+      "title": "Winter Wonders Half-Week",
+      "start_date": "2026-12-21",
+      "end_date": "2026-12-23",
+      "min_age": 8,
+      "max_age": 10,
+      "price_usd": 150.0,
+      "registration_status": "full",
+      "url": "https://example.org/camps",
+      "breaks": ["winter-break"],
+      "needed_days": ["2026-12-21", "2026-12-22", "2026-12-23"]
+    },
+    {
+      "key": "4e53fc564b1ac4d4",
+      "title": "Robotics Weekend Workshop",
+      "start_date": "2027-03-20",
+      "end_date": "2027-03-21",
+      "min_age": 9,
+      "max_age": 14,
+      "price_usd": null,
+      "registration_status": "unknown",
+      "url": "https://example.org/camps",
+      "breaks": [],
+      "needed_days": []
+    },
+    {
+      "key": "e5e0d13e88472ad3",
+      "title": "Presidents Week Art Studio",
+      "start_date": "2027-02-13",
+      "end_date": "2027-02-17",
+      "min_age": 5,
+      "max_age": 11,
+      "price_usd": 310.0,
+      "registration_status": "open",
+      "url": "https://example.org/camps/presidents-week-art",
+      "breaks": ["february-break"],
+      "needed_days": ["2027-02-15", "2027-02-16", "2027-02-17"]
+    }
+  ]
+}
