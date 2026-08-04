@@ -22,6 +22,11 @@ providers:
     homepage: https://example.org/
     locality: Decatur
 
+  - slug: tucker-rec
+    name: City of Tucker Recreation
+    homepage: https://tucker.recdesk.com/
+    locality: Tucker
+
   - slug: fernbank-science-center
     name: Fernbank Science Center
     homepage: https://www.fernbank.edu/
@@ -43,23 +48,35 @@ providers:
     locality: Grant Park
 
 sources:
-  # The positive control. Disabled, because example.org does not serve it —
-  # the page lives at tests/fixtures/example_camps.html and is exercised by the
-  # test suite, not by a live fetch. To see the tool work end to end without a
-  # network, serve the fixture yourself:
-  #
-  #     python3 -m http.server -d tests/fixtures 8000
-  #     campradar update  # after pointing this url at localhost:8000
+  # The positive control, enabled so a fresh clone produces output immediately
+  # with no network and no local server. The path is relative to wherever you
+  # run campradar, i.e. the repo root. Retire this once a real source works.
   - id: example-camps
     provider_slug: example-camps
     adapter: jsonld
-    enabled: false
+    enabled: true
     urls:
-      - https://example.org/camps
+      - tests/fixtures/example_camps.html
 
   # --- real sources -------------------------------------------------------
-  # All disabled until confirmed to publish JSON-LD. Each was checked once and
-  # the finding is recorded so re-enabling is a decision made from notes.
+
+  # The one source producing real camps. Not JSON-LD: RecDesk renders its
+  # programme table over XHR and keys the filter to ASP.NET_SessionId, so the
+  # visible page is always empty to a stateless fetcher. See recdesk.py.
+  #
+  # Category 9 is Day Camp (Outdoor Education / Specialty / Sports /
+  # Traditional); 20 is Teen Camp. Category 3 ("Youth") is 25 sports
+  # programmes and one dance class, which is what this source used to point at
+  # and why it never produced a camp.
+  - id: tucker-rec
+    provider_slug: tucker-rec
+    adapter: recdesk
+    enabled: true
+    base_url: https://tucker.recdesk.com
+    categories: ["9", "20"]
+
+  # The rest are disabled until confirmed to publish JSON-LD. Each was checked
+  # once and the finding recorded, so re-enabling is a decision made from notes.
 
   - id: fernbank-camps
     provider_slug: fernbank-science-center

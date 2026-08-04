@@ -6,6 +6,8 @@ throttling code on the tested path rather than stubbing past it.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import httpx
 import pytest
 
@@ -202,3 +204,80 @@ def test_an_http_error_is_raised_not_swallowed(tmp_path):
     fetcher = Fetcher(tmp_path / "cache", delay_seconds=0, client=client)
     with pytest.raises(FetchError, match="500"):
         fetcher.get("https://example.org/x")
+
+
+def test_a_bare_path_is_read_from_disk(tmp_path):
+    """Saved pages are how you develop a parser without hammering a server."""
+    page = tmp_path / "saved.html"
+    page.write_text("<html><body>hi</body></html>", encoding="utf-8")
+
+    fetcher = Fetcher(tmp_path / "cache", delay_seconds=0)
+    assert fetcher.get(str(page)).text == "<html><body>hi</body></html>"
+    assert fetcher.get(f"file://{page}").text == "<html><body>hi</body></html>"
+
+
+def test_a_missing_local_file_is_a_fetch_error(tmp_path):
+    fetcher = Fetcher(tmp_path / "cache", delay_seconds=0)
+    with pytest.raises(FetchError):
+        fetcher.get(str(tmp_path / "absent.html"))
+
+
+def test_the_shipped_config_works_with_no_network(tmp_path, monkeypatch):
+    """A fresh clone must produce output from `campradar update` alone.
+
+    Real sources are stripped first. The suite must never touch a provider's
+    server: it would be rude, it would be flaky, and a green build would then
+    depend on someone else's uptime.
+    """
+    import yaml
+
+    repo = Path(__file__).resolve().parent.parent
+    monkeypatch.chdir(repo)
+
+    shipped = yaml.safe_load((repo / "config" / "camps.yaml").read_text())
+    shipped["sources"] = [
+        s
+        for s in shipped["sources"]
+        if all(not str(u).startswith("http") for u in s.get("urls", [])) and not s.get("base_url")
+    ]
+    assert shipped["sources"], "no local source left to test with"
+
+    camps = tmp_path / "camps.yaml"
+    camps.write_text(yaml.safe_dump(shipped))
+    state = tmp_path / "camps.json"
+
+    assert (
+        cli.main(
+            [
+                "--camps",
+                str(camps),
+                "--dates",
+                str(repo / "config" / "dates.yaml"),
+                "--state",
+                str(state),
+                "update",
+                "--cache",
+                str(tmp_path / "cache"),
+                "--delay",
+                "0",
+            ]
+        )
+        == 0
+    )
+
+    # All four, not just the two that carry their own url. A local source path
+    # is not a valid listing link, and falling back to it used to drop them.
+    import json
+
+    assert len(json.loads(state.read_text())["sessions"]) == 4
+
+
+def test_the_shipped_config_is_valid(tmp_path):
+    """Every source names a known adapter and a provider that exists."""
+    repo = Path(__file__).resolve().parent.parent
+    providers, sources = cli.load_camps_config(repo / "config" / "camps.yaml")
+
+    assert providers
+    assert sources
+    enabled = [s["id"] for s in sources if s.get("enabled")]
+    assert "tucker-rec" in enabled

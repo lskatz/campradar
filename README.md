@@ -19,7 +19,7 @@ This is the command-line core, and nothing else. Three moving parts:
 
 ```sh
 pip install -e ".[dev]"
-pytest                    # 68 tests, under a second
+pytest                    # 106 tests, under a second
 ```
 
 ## Use
@@ -104,8 +104,9 @@ sources:
       - https://dunwoodynature.org/education/camp-programs/
 ```
 
-The one parser reads schema.org JSON-LD, which a surprising number of sites
-publish for SEO without knowing it. Whether a given site will work:
+There are two parsers. `jsonld` reads schema.org markup, which a surprising
+number of sites publish for SEO without knowing it — try it first. Whether a
+given site will work:
 
 ```sh
 curl -s https://their-site.example/camps | grep -c 'application/ld+json'
@@ -114,6 +115,28 @@ curl -s https://their-site.example/camps | grep -c 'application/ld+json'
 If that is zero, no amount of configuration will help and the site needs its
 own parser. `sources.enabled: false` retires a source without losing the
 knowledge of it.
+
+`recdesk` is the second parser, for RecDesk Community portals:
+
+```yaml
+  - id: tucker-rec
+    provider_slug: tucker-rec
+    adapter: recdesk
+    enabled: true
+    base_url: https://tucker.recdesk.com
+    categories: ["9", "20"]      # 9 = Day Camp, 20 = Teen Camp
+```
+
+RecDesk cannot be scraped by fetching a page: the programme table arrives over
+XHR and the active filter is keyed to `ASP.NET_SessionId`, so a stateless GET
+lands in a session whose default filter resolves to nothing. `recdesk.py` posts
+to `/Community/Program/FilterPrograms` the way the portal's own JavaScript
+does, after priming the session with a GET. The `categories` are RecDesk
+`ProgramType` ids — find them in the portal's own category links.
+
+Adding a third parser is a new module exposing
+`read_source(source, fetcher) -> list[CampSession]`, plus one line in
+`READERS` in `cli.py`. That signature is the whole contract.
 
 ## Editing `dates.yaml`
 
@@ -124,7 +147,7 @@ semester restarts, not the restart itself.
 
 ## Testing
 
-68 tests, no network, no real clock. Two of them are positive controls and the
+106 tests, no network, no real clock. Two of them are positive controls and the
 rest are boundary cases.
 
 **The parse control.** `tests/fixtures/example_camps.html` is a saved listing
@@ -134,6 +157,12 @@ wrapper. `example_camps.expected.json` says exactly what it must produce,
 including the content-hash `key` of every session. Those keys are frozen on
 purpose — if one changes, the fingerprinting logic changed, and the next run
 would silently re-report the entire catalogue as new.
+
+**The RecDesk control.** `tests/fixtures/recdesk_day_camp.html` is a saved
+FilterPrograms fragment with frozen expectations for all five rows, including a
+one-day camp with no stated ages. Separate tests pin the POST body shape, the
+session priming, and the paging stop condition, because those are the parts
+that fail silently rather than loudly.
 
 **The merge control.** A fixed pair of runs on a pinned clock, asserting the
 diff is exactly `1 new, 1 newly open, 1 disappeared` and that `first_seen` on
@@ -147,18 +176,25 @@ prove --exec 'pytest --tap-stream' tests/     # if you would rather use prove
 ```
 
 ```
-1..68
+1..106
 ok 1 tests/test_cli.py::test_update_then_list
 ok 2 tests/test_cli.py::test_list_is_sorted_by_start_date
 ```
 
-To watch the whole thing work without touching the network, serve the control
-fixture and point a source at it:
+A source URL can be a local path, so the shipped config works on a fresh clone
+with no network and no server:
 
 ```sh
-python3 -m http.server -d tests/fixtures 8765 &
-# set urls: [http://127.0.0.1:8765/example_camps.html] in camps.yaml
-campradar update --delay 0 && campradar list
+campradar update && campradar list
+```
+
+That reads `tests/fixtures/example_camps.html` off disk. Saved pages are also
+how you develop a parser without hammering someone's server, and how you re-run
+a fix against the exact bytes that broke it:
+
+```sh
+curl -s https://their-site.example/camps > /tmp/page.html
+# point a source at /tmp/page.html, then iterate
 ```
 
 ## Design notes
@@ -171,6 +207,10 @@ ranges are permissive, and ambiguity resolves toward including the session.
 nobody reads it. `first_seen` is a first-class field, not a log line, and
 `camps.json` is committed because it is what carries that history between
 runs.
+
+**"No camps" and "the markup moved" are different.** If a RecDesk fragment
+holds programme links but no readable dates, that raises rather than returning
+an empty list. A silent zero is how a broken source hides for a season.
 
 **Fail loudly per source, quietly per row.** A malformed listing is skipped; a
 dead site is reported. The run fails outright only when *every* source fails —

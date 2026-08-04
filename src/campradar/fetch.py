@@ -21,6 +21,7 @@ import logging
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import unquote, urlparse
 
 import httpx
 
@@ -36,6 +37,21 @@ USER_AGENT = (
 
 class FetchError(RuntimeError):
     """A page could not be read at all."""
+
+
+def _local_path(url: str) -> Path | None:
+    """The filesystem path a URL refers to, or None if it is a real URL.
+
+    Accepts `file:///abs/path` and bare paths, absolute or relative. A relative
+    path resolves against the working directory, so config can say
+    `tests/fixtures/example_camps.html` and mean it.
+    """
+    parsed = urlparse(url)
+    if parsed.scheme == "file":
+        return Path(unquote(parsed.path))
+    if parsed.scheme:  # http, https, anything else with a scheme
+        return None
+    return Path(url)
 
 
 @dataclass(slots=True)
@@ -83,7 +99,20 @@ class Fetcher:
         self._last_request = time.monotonic()
 
     def get(self, url: str) -> FetchResult:
-        """Fetch a URL, using the cache when the server says nothing changed."""
+        """Fetch a URL, using the cache when the server says nothing changed.
+
+        A `file://` URL or a bare filesystem path is read straight off disk.
+        That is not a testing hack: saved pages are how you develop a parser
+        without hammering someone's server, and how you re-run a fix against
+        the exact bytes that broke it.
+        """
+        if local := _local_path(url):
+            try:
+                text = local.read_text(encoding="utf-8")
+            except OSError as exc:
+                raise FetchError(f"{url}: {exc}") from exc
+            return FetchResult(url=url, text=text, status_code=200, from_cache=False)
+
         body_path, meta_path = self._paths(url)
         headers: dict[str, str] = {}
         if meta_path.exists() and body_path.exists():
@@ -114,6 +143,28 @@ class Fetcher:
             json.dumps({"url": url, "etag": response.headers.get("etag")}),
             encoding="utf-8",
         )
+        return FetchResult(
+            url=url, text=response.text, status_code=response.status_code, from_cache=False
+        )
+
+    def post_json(
+        self, url: str, body: dict, *, headers: dict[str, str] | None = None
+    ) -> FetchResult:
+        """POST a JSON body and return the response text.
+
+        Deliberately not cached. A GET of a listing page is idempotent and
+        worth caching; a filter POST is a query whose answer we are asking the
+        server to recompute, and caching it would hide exactly the changes this
+        tool is looking for. Throttling still applies.
+        """
+        self._throttle()
+        try:
+            response = self._client.post(url, json=body, headers=headers or {})
+        except httpx.HTTPError as exc:
+            raise FetchError(f"{url}: {exc}") from exc
+
+        if response.status_code >= 400:
+            raise FetchError(f"{url}: HTTP {response.status_code}")
         return FetchResult(
             url=url, text=response.text, status_code=response.status_code, from_cache=False
         )

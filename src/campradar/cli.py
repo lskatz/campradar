@@ -21,7 +21,7 @@ from typing import Any
 
 import yaml
 
-from . import jsonld
+from . import jsonld, recdesk
 from .fetch import Fetcher, FetchError
 from .models import Provider, SessionRecord
 from .store import (
@@ -41,6 +41,14 @@ DEFAULT_CAMPS = Path("config/camps.yaml")
 DEFAULT_DATES = Path("config/dates.yaml")
 DEFAULT_STATE = Path("data/camps.json")
 DEFAULT_CACHE = Path("data/cache")
+
+#: Maps the `adapter:` key in camps.yaml to a reader. Every reader has the same
+#: signature — (source config, fetcher) -> list[CampSession] — which is the
+#: whole contract. Add a parser here and it becomes configurable.
+READERS = {
+    "jsonld": jsonld.read_source,
+    "recdesk": recdesk.read_source,
+}
 
 #: Column order for `list`. This is the tool's public contract — append new
 #: columns at the end so that anything parsing by position keeps working.
@@ -81,8 +89,9 @@ def load_camps_config(path: Path) -> tuple[dict[str, Provider], list[dict[str, A
         if slug not in providers:
             raise ValueError(f"source {source['id']}: unknown provider_slug {slug!r}")
         adapter = source.get("adapter", "jsonld")
-        if adapter != "jsonld":
-            raise ValueError(f"source {source['id']}: unknown adapter {adapter!r}")
+        if adapter not in READERS:
+            known = ", ".join(sorted(READERS))
+            raise ValueError(f"source {source['id']}: unknown adapter {adapter!r} (known: {known})")
     return providers, sources
 
 
@@ -104,8 +113,9 @@ def cmd_update(args: argparse.Namespace) -> int:
 
     with Fetcher(args.cache, delay_seconds=args.delay) as fetcher:
         for source in enabled:
+            reader = READERS[source.get("adapter", "jsonld")]
             try:
-                found = jsonld.read_source(source, fetcher)
+                found = reader(source, fetcher)
             except (FetchError, ValueError) as exc:
                 # Loud per source, but one dead site does not stop the run.
                 failures.append(source["id"])

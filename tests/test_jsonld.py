@@ -101,3 +101,19 @@ def test_url_falls_back_to_the_page_when_the_listing_has_none():
         html, source_id="s", provider_slug="p", fallback_url="https://example.org/camps"
     )[0]
     assert str(session.url) == "https://example.org/camps"
+
+
+def test_a_local_source_path_is_not_used_as_a_listing_url():
+    """A path is not a link. Falling back to it would drop the listing."""
+    html = """
+    <script type="application/ld+json">
+    {"@type": "Event", "name": "No Link", "startDate": "2026-11-03"}
+    </script>
+    """
+    session = parse_page(
+        html,
+        source_id="s",
+        provider_slug="p",
+        fallback_url="tests/fixtures/example_camps.html",
+    )[0]
+    assert session.url is None
